@@ -65,7 +65,7 @@ app.post('/api/generate', async (req, res) => {
 
     // Вызываем скрытое API Google с ключом, который спрятан в .env файле этого сервера
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-2.0-flash-preview-image-generation',
       contents: {
         parts: [
           { inlineData: { data: imageBase64, mimeType: mimeType || 'image/jpeg' } },
@@ -108,7 +108,7 @@ app.post('/api/refine', async (req, res) => {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-2.0-flash-preview-image-generation',
       contents: {
         parts: [
           { inlineData: { data: imageBase64, mimeType: mimeType || 'image/jpeg' } },

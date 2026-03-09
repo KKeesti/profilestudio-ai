@@ -298,20 +298,20 @@ const App: React.FC = () => {
                       placeholder={t.customPromptPlaceholder}
                       className="w-full bg-white/5 border border-white/10 rounded-[2rem] p-6 text-white focus:border-gold outline-none h-32 md:h-40 resize-none transition-all placeholder:text-slate-700 text-lg shadow-inner focus:bg-white/[0.07]"
                     />
-
-                    {customPrompt.length > 0 && selectedStyle && (
-                      <div className="mt-8 animate-in fade-in slide-in-from-top-6 duration-500">
-                        <button
-                          type="button"
-                          onClick={() => handleGenerate(selectedStyle)}
-                          className="w-full py-7 bg-gold text-black rounded-[2rem] font-black text-2xl flex items-center justify-center gap-5 transition-all hover:bg-white hover:scale-[1.02] shadow-[0_20px_50px_rgba(194,163,93,0.35)] active:scale-95"
-                        >
-                          <ICONS.Magic /> {t.generateBtn}
-                        </button>
-                        <p className="text-center mt-4 text-[9px] text-slate-600 uppercase tracking-[0.4em] font-bold">Neural Engine Processing ~30s</p>
-                      </div>
-                    )}
                   </div>
+
+                  {selectedStyle && (
+                    <div className="mt-4 animate-in fade-in slide-in-from-top-6 duration-500">
+                      <button
+                        type="button"
+                        onClick={() => handleGenerate(selectedStyle)}
+                        className="w-full py-7 bg-gold text-black rounded-[2rem] font-black text-2xl flex items-center justify-center gap-5 transition-all hover:bg-white hover:scale-[1.02] shadow-[0_20px_50px_rgba(194,163,93,0.35)] active:scale-95"
+                      >
+                        <ICONS.Magic /> {t.generateBtn}
+                      </button>
+                      <p className="text-center mt-4 text-[9px] text-slate-600 uppercase tracking-[0.4em] font-bold">Neural Engine Processing ~30s</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
