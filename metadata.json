@@ -1,0 +1,7 @@
+{
+  "name": "ProfileStudio AI",
+  "description": "Professional AI-powered studio photography for dating profiles and social media. Get high-quality, photorealistic portraits in seconds.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
