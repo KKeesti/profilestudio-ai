@@ -138,7 +138,7 @@ app.post('/api/refine', async (req, res) => {
 app.use(express.static(path.join(__dirname, '../dist')));
 
 // Любой другой запрос (например, обновление страницы руками), отправляем на index.html
-app.get('*', (req, res) => {
+app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 // ===============================================
