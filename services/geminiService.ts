@@ -1,10 +1,10 @@
-/// <reference types="vite/client" />
 import { PhotoStyle, AspectRatio } from "../types";
 
 export class GeminiService {
-  // Если мы запускаем на локальном компьютере (DEV), стучимся на localhost:3001.
-  // Если это развернуто в интернете (PROD), используем относительный путь /api.
-  private static API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
+  // localhost = локальная разработка, иное = продакшн-сервер в интернете
+  private static API_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:3001/api'
+    : '/api';
 
   static async generateStudioPhoto(
     imageBase64: string,
