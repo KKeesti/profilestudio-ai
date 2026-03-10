@@ -101,13 +101,20 @@ app.post('/api/user/check', async (req, res) => {
 
 // Эндпоинт для создания сессии оплаты Stripe
 app.post('/api/create-checkout-session', async (req, res) => {
-  const { email, priceId, credits } = req.body;
+  const { email, priceId: planId, credits } = req.body;
+
+  // Определяем реальный ID цены из настроек Render
+  const stripePriceId = planId === 'plan_small' ? process.env.PRICE_20_ID : process.env.PRICE_50_ID;
+
+  if (!stripePriceId) {
+    return res.status(500).json({ error: 'Stripe Price ID not configured in Render environment' });
+  }
 
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: email,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: stripePriceId, quantity: 1 }],
       mode: 'payment',
       success_url: `${process.env.FRONTEND_URL}/?payment=success`,
       cancel_url: `${process.env.FRONTEND_URL}/?payment=cancel`,
