@@ -505,12 +505,6 @@ const App: React.FC = () => {
           onSelect={async (planId) => {
             if (!userEmail) return;
 
-            // Здесь используем системные ID из Render Environment
-            const priceIdMap: Record<string, string> = {
-              'plan_small': 'price_id_placeholder_20', // Будет заменено на сервере
-              'plan_large': 'price_id_placeholder_50'
-            };
-
             const creditsToAdd = planId === 'plan_small' ? 20 : 50;
 
             try {
