@@ -84,22 +84,27 @@ const App: React.FC = () => {
 
   const handleGenerate = async (style: PhotoStyle) => {
     if (!originalImage) return;
+
+    // 1. Сначала проверяем ключ (технический шаг)
     if (!hasKey) {
       await handleKeySetup();
       return;
     }
 
-    const t = TRANSLATIONS[language];
-
-    // Если кредиты кончились — запускаем воронку оплаты
-    if (credits <= 0) {
-      if (!userEmail) {
-        setShowEmailModal(true);
-      } else {
-        setShowPaymentModal(true);
-      }
+    // 2. ИСПРАВЛЕНИЕ: Если имейл еще не введен, ОБЯЗАТЕЛЬНО просим его
+    // Это создаст запись в базе данных и даст 5 бесплатных попыток
+    if (!userEmail) {
+      setShowEmailModal(true);
       return;
     }
+
+    // 3. Если имейл есть, но в базе 0 кредитов — только тогда оплата
+    if (credits <= 0) {
+      setShowPaymentModal(true);
+      return;
+    }
+
+    const t = TRANSLATIONS[language];
 
     const statusMap = {
       [PhotoStyle.CLASSIC_STUDIO]: t.processingClassic,
