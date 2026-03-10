@@ -21,7 +21,7 @@ const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [credits, setCredits] = useState<number>(() => {
     const saved = localStorage.getItem('ps_credits');
-    return saved ? parseInt(saved) : 3;
+    return saved ? parseInt(saved) : 5;
   });
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('ps_email'));
   const [showEmailModal, setShowEmailModal] = useState(false);
