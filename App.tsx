@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppStep, ProcessingState, PhotoStyle, AspectRatio, Language } from './types';
 import Header from './components/Header';
+import EmailModal from './components/EmailModal';
+import PaymentModal from './components/PaymentModal';
 import { GeminiService } from './services/geminiService';
 import { ICONS } from './constants';
 import { TRANSLATIONS } from './translations';
@@ -17,7 +19,13 @@ const App: React.FC = () => {
   const [correctionRequest, setCorrectionRequest] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
   const [hasKey, setHasKey] = useState<boolean | null>(null);
-  const [credits, setCredits] = useState<number>(3);
+  const [credits, setCredits] = useState<number>(() => {
+    const saved = localStorage.getItem('ps_credits');
+    return saved ? parseInt(saved) : 3;
+  });
+  const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('ps_email'));
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [processing, setProcessing] = useState<ProcessingState>({
     isProcessing: false,
     status: '',
@@ -42,6 +50,10 @@ const App: React.FC = () => {
     };
     checkKey();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('ps_credits', credits.toString());
+  }, [credits]);
 
   const handleKeySetup = async () => {
     try {
@@ -79,8 +91,13 @@ const App: React.FC = () => {
 
     const t = TRANSLATIONS[language];
 
+    // Если кредиты кончились — запускаем воронку оплаты
     if (credits <= 0) {
-      alert(t.outOfCredits);
+      if (!userEmail) {
+        setShowEmailModal(true);
+      } else {
+        setShowPaymentModal(true);
+      }
       return;
     }
 
@@ -457,6 +474,37 @@ const App: React.FC = () => {
           display: none;
         }
       `}</style>
+      {/* Trial / Payment Modals */}
+      {showEmailModal && (
+        <EmailModal
+          language={language}
+          onClose={() => setShowEmailModal(false)}
+          onSubmit={(email) => {
+            setUserEmail(email);
+            localStorage.setItem('ps_email', email);
+            setShowEmailModal(false);
+            setShowPaymentModal(true);
+          }}
+        />
+      )}
+
+      {showPaymentModal && (
+        <PaymentModal
+          language={language}
+          onSelect={(planId) => {
+            // Здесь в будущем будет вызов Stripe Checkout
+            // Пока просто имитируем покупку для теста
+            const newCredits = planId === 'plan_small' ? 20 : 50;
+            alert(`Переходим к оплате ${planId === 'plan_small' ? '5€' : '10€'}...\n(Stripe будет подключен следующим шагом)`);
+
+            // ВРЕМЕННО для теста: начисляем кредиты сразу
+            // const updated = credits + newCredits;
+            // setCredits(updated);
+            // localStorage.setItem('ps_credits', updated.toString());
+            // setShowPaymentModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };
