@@ -66,17 +66,17 @@ app.post('/api/generate', async (req, res) => {
     // Вызываем скрытое API Google с ключом, который спрятан в .env файле этого сервера
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash-preview-image-generation',
-      contents: {
-        parts: [
-          { inlineData: { data: imageBase64, mimeType: mimeType || 'image/jpeg' } },
-          { text: prompt },
-        ],
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: aspectRatio,
-          imageSize: "1K"
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { data: imageBase64, mimeType: mimeType || 'image/jpeg' } },
+            { text: prompt },
+          ],
         }
+      ],
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
       }
     });
 
@@ -109,17 +109,17 @@ app.post('/api/refine', async (req, res) => {
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash-preview-image-generation',
-      contents: {
-        parts: [
-          { inlineData: { data: imageBase64, mimeType: mimeType || 'image/jpeg' } },
-          { text: prompt },
-        ],
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: aspectRatio,
-          imageSize: "1K"
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { data: imageBase64, mimeType: mimeType || 'image/jpeg' } },
+            { text: prompt },
+          ],
         }
+      ],
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
       }
     });
 
