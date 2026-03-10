@@ -112,17 +112,16 @@ const App: React.FC = () => {
     try {
       const base64Data = originalImage.split(',')[1];
       const mimeType = originalImage.split(';')[0].split(':')[1];
-      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, customPrompt);
+      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, customPrompt, userEmail || 'guest');
       setResultImage(res);
       setStep(AppStep.RESULT);
       setCredits(prev => Math.max(0, prev - 1));
     } catch (error: any) {
       console.error("Generation error:", error);
-      if (error.message?.includes("Requested entity was not found.")) {
-        setHasKey(false);
-        await handleKeySetup();
+      if (error.message === 'OUT_OF_CREDITS') {
+        setShowPaymentModal(true);
       } else {
-        alert("Произошла ошибка при генерации. Попробуйте обновить страницу.");
+        alert("Generation error: " + error.message);
       }
     } finally {
       setProcessing({ isProcessing: false, status: '' });
@@ -130,18 +129,21 @@ const App: React.FC = () => {
   };
 
   const handleRefine = async () => {
-    if (!resultImage || !correctionRequest) return;
-    const t = TRANSLATIONS[language];
-    setProcessing({ isProcessing: true, status: t.processingRefine });
+    if (!resultImage || !correctionRequest || !userEmail) return;
+
+    setProcessing({ isProcessing: true, status: language === Language.RU ? 'Применяем правки...' : 'Refining...' });
+
     try {
-      const base64Data = resultImage.split(',')[1];
-      const mimeType = resultImage.split(';')[0].split(':')[1];
-      const res = await GeminiService.refinePhoto(base64Data, mimeType, correctionRequest, aspectRatio);
+      const res = await GeminiService.refinePhoto(resultImage, correctionRequest, userEmail);
       setResultImage(res);
       setCorrectionRequest('');
+      setCredits(prev => Math.max(0, prev - 1));
     } catch (error: any) {
-      console.error("Refine error:", error);
-      alert("Не удалось применить правки.");
+      if (error.message === 'OUT_OF_CREDITS') {
+        setShowPaymentModal(true);
+      } else {
+        alert("Refinement error: " + error.message);
+      }
     } finally {
       setProcessing({ isProcessing: false, status: '' });
     }
@@ -479,11 +481,15 @@ const App: React.FC = () => {
         <EmailModal
           language={language}
           onClose={() => setShowEmailModal(false)}
-          onSubmit={(email) => {
-            setUserEmail(email);
+          onSubmit={async (email) => {
+            const userData = await GeminiService.checkUser(email);
+            setUserEmail(userData.email);
+            setCredits(userData.credits);
             localStorage.setItem('ps_email', email);
             setShowEmailModal(false);
-            setShowPaymentModal(true);
+            if (userData.credits <= 0) {
+              setShowPaymentModal(true);
+            }
           }}
         />
       )}
@@ -491,17 +497,25 @@ const App: React.FC = () => {
       {showPaymentModal && (
         <PaymentModal
           language={language}
-          onSelect={(planId) => {
-            // Здесь в будущем будет вызов Stripe Checkout
-            // Пока просто имитируем покупку для теста
-            const newCredits = planId === 'plan_small' ? 20 : 50;
-            alert(`Переходим к оплате ${planId === 'plan_small' ? '5€' : '10€'}...\n(Stripe будет подключен следующим шагом)`);
+          onSelect={async (planId) => {
+            if (!userEmail) return;
 
-            // ВРЕМЕННО для теста: начисляем кредиты сразу
-            // const updated = credits + newCredits;
-            // setCredits(updated);
-            // localStorage.setItem('ps_credits', updated.toString());
-            // setShowPaymentModal(false);
+            // Здесь используем системные ID из Render Environment
+            const priceIdMap: Record<string, string> = {
+              'plan_small': 'price_id_placeholder_20', // Будет заменено на сервере
+              'plan_large': 'price_id_placeholder_50'
+            };
+
+            const creditsToAdd = planId === 'plan_small' ? 20 : 50;
+
+            try {
+              const session = await GeminiService.createCheckoutSession(userEmail, planId, creditsToAdd);
+              if (session.url) {
+                window.location.href = session.url;
+              }
+            } catch (e: any) {
+              alert("Payment Error: " + e.message);
+            }
           }}
         />
       )}
