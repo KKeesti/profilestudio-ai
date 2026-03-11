@@ -487,13 +487,18 @@ const App: React.FC = () => {
           language={language}
           onClose={() => setShowEmailModal(false)}
           onSubmit={async (email) => {
-            const userData = await GeminiService.checkUser(email);
-            setUserEmail(userData.email);
-            setCredits(userData.credits);
-            localStorage.setItem('ps_email', email);
-            setShowEmailModal(false);
-            if (userData.credits <= 0) {
-              setShowPaymentModal(true);
+            try {
+              const userData = await GeminiService.checkUser(email);
+              setUserEmail(userData.email);
+              setCredits(userData.credits);
+              localStorage.setItem('ps_email', email);
+              setShowEmailModal(false);
+              if (userData.credits <= 0) {
+                setShowPaymentModal(true);
+              }
+            } catch (error: any) {
+              console.error("User check error:", error);
+              alert("Ошибка при проверке пользователя: " + error.message);
             }
           }}
         />
