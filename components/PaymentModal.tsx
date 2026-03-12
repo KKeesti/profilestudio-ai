@@ -2,6 +2,7 @@ import React from 'react';
 
 interface PaymentModalProps {
     onSelect: (planId: string) => void;
+    onClose?: () => void;
     language: string;
 }
 
@@ -44,12 +45,20 @@ const TEXTS: Record<string, any> = {
     }
 };
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, language }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, onClose, language }) => {
     const lang = language in TEXTS ? language : 'en';
     const t = TEXTS[lang];
 
     return (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[210] flex items-center justify-center p-6 animate-in fade-in duration-500">
+            {onClose && (
+                <button 
+                    onClick={onClose}
+                    className="absolute top-10 right-10 text-white/40 hover:text-white transition-colors text-4xl p-4 z-[220]"
+                >
+                    ✕
+                </button>
+            )}
             <div className="w-full max-w-2xl space-y-10 animate-in slide-in-from-bottom-10 duration-700">
                 <div className="text-center space-y-4">
                     <h2 className="text-4xl md:text-5xl font-serif text-white italic">{t.title}</h2>

@@ -30,6 +30,7 @@ const App: React.FC = () => {
     isProcessing: false,
     status: '',
   });
+  const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancel' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,7 +49,32 @@ const App: React.FC = () => {
         setHasKey(false);
       }
     };
+    const refreshCredits = async () => {
+      const email = localStorage.getItem('ps_email');
+      if (email) {
+        try {
+          const userData = await GeminiService.checkUser(email);
+          setCredits(userData.credits);
+        } catch (e) {
+          console.error("Failed to refresh credits:", e);
+        }
+      }
+    };
+
     checkKey();
+
+    // Check URL for payment status
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') === 'success') {
+      setPaymentStatus('success');
+      // Очищаем URL от параметров
+      window.history.replaceState({}, '', window.location.pathname);
+      // Обновляем баланс (может занять пару секунд из-за webhook)
+      setTimeout(refreshCredits, 2000); 
+    } else if (params.get('payment') === 'cancel') {
+      setPaymentStatus('cancel');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
 
   useEffect(() => {
@@ -443,8 +469,11 @@ const App: React.FC = () => {
         language={language}
         credits={credits}
         onBuyCredits={() => {
-          alert('💳 Redirecting to Stripe Checkout payment page...\n\n(Mock mode: added 10 credits)');
-          setCredits(prev => prev + 10);
+          if (!userEmail) {
+            setShowEmailModal(true);
+          } else {
+            setShowPaymentModal(true);
+          }
         }}
       />
       <main className="container mx-auto px-6 pt-8 relative z-10">
@@ -521,7 +550,27 @@ const App: React.FC = () => {
               alert("Payment Error: " + e.message);
             }
           }}
+          onClose={() => setShowPaymentModal(false)}
         />
+      )}
+
+      {paymentStatus && (
+        <div className="fixed bottom-10 left-10 z-[300] bg-gold text-black px-8 py-4 rounded-2xl font-bold shadow-2xl animate-in slide-in-from-left-10 duration-500 flex items-center gap-4">
+          <span className="text-2xl">{paymentStatus === 'success' ? '✅' : '❌'}</span>
+          <div>
+            <div className="text-sm">
+              {paymentStatus === 'success' 
+                ? (language === Language.RU ? 'Оплата прошла успешно!' : 'Payment successful!')
+                : (language === Language.RU ? 'Оплата отменена' : 'Payment cancelled')}
+            </div>
+            <div className="text-[10px] opacity-70 uppercase tracking-widest">
+              {paymentStatus === 'success' 
+                ? (language === Language.RU ? 'Кредиты скоро будут зачислены' : 'Credits will be added shortly')
+                : (language === Language.RU ? 'Попробуйте еще раз' : 'Please try again')}
+            </div>
+          </div>
+          <button onClick={() => setPaymentStatus(null)} className="ml-4 hover:scale-110 transition-transform">✕</button>
+        </div>
       )}
     </div>
   );
