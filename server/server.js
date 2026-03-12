@@ -195,7 +195,7 @@ app.post('/api/generate', async (req, res) => {
       generationConfig: { responseModalities: ['image'] }
     });
 
-    const generatedImage = response.response.candidates[0]?.content?.parts
+    const generatedImage = response.candidates?.[0]?.content?.parts
       ?.find(p => p.inlineData)?.inlineData?.data;
 
     if (!generatedImage) {
@@ -244,7 +244,7 @@ app.post('/api/refine', async (req, res) => {
       generationConfig: { responseModalities: ['image'] }
     });
 
-    const refinedImage = response.response.candidates[0]?.content?.parts
+    const refinedImage = response.candidates?.[0]?.content?.parts
       ?.find(p => p.inlineData)?.inlineData?.data;
 
     if (!refinedImage) {
