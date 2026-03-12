@@ -183,19 +183,19 @@ app.post('/api/generate', async (req, res) => {
     }
 
     // 2. Генерируем изображение
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
       contents: [{
         role: 'user',
         parts: [
-          { inlineData: { mimeType: 'image/jpeg', data: image } },
-          { text: `${MASTER_PROMPT}\nStyle: ${style}.\nUser Instructions: ${prompt || 'Professional studio portrait with clean lighting.'}` }
+          { text: `${MASTER_PROMPT}\nStyle: ${style}.\nUser Instructions: ${prompt || 'Professional studio portrait with clean lighting.'}` },
+          { inlineData: { mimeType: 'image/jpeg', data: image } }
         ]
       }],
       generationConfig: { responseModalities: ['image'] }
     });
 
-    const generatedImage = result.response.candidates[0]?.content?.parts
+    const generatedImage = response.response.candidates[0]?.content?.parts
       ?.find(p => p.inlineData)?.inlineData?.data;
 
     if (!generatedImage) {
@@ -232,19 +232,19 @@ app.post('/api/refine', async (req, res) => {
       return res.status(403).json({ error: 'OUT_OF_CREDITS' });
     }
 
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
       contents: [{
         role: 'user',
         parts: [
-          { inlineData: { mimeType: 'image/jpeg', data: image.split(',')[1] } },
-          { text: `${MASTER_PROMPT}\nREFINEMENT TASK: ${correction}. Focus only on requested changes.` }
+          { text: `${MASTER_PROMPT}\nREFINEMENT TASK: ${correction}. Focus only on requested changes.` },
+          { inlineData: { mimeType: 'image/jpeg', data: image.split(',')[1] } }
         ]
       }],
       generationConfig: { responseModalities: ['image'] }
     });
 
-    const refinedImage = result.response.candidates[0]?.content?.parts
+    const refinedImage = response.response.candidates[0]?.content?.parts
       ?.find(p => p.inlineData)?.inlineData?.data;
 
     if (!refinedImage) {
