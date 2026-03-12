@@ -184,7 +184,7 @@ app.post('/api/generate', async (req, res) => {
 
     // 2. Генерируем изображение
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-image',
       contents: [{
         role: 'user',
         parts: [
@@ -233,7 +233,7 @@ app.post('/api/refine', async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-image',
       contents: [{
         role: 'user',
         parts: [
