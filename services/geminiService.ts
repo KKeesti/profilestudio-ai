@@ -39,12 +39,12 @@ export class GeminiService {
     style: string,
     aspectRatio: string,
     prompt: string,
-    email: string
+    email: string | null
   ): Promise<string> {
     const response = await fetch(`${this.API_URL}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image, style, prompt, email }),
+      body: JSON.stringify({ image, mimeType, style, aspectRatio, prompt, email }),
     });
     const data = await this.handleResponse(response);
     return data.image;
@@ -59,5 +59,17 @@ export class GeminiService {
     });
     const data = await this.handleResponse(response);
     return data.image;
+  }
+  // Загружает историю генераций пользователя
+  static async getHistory(email: string): Promise<Array<{
+    id: string;
+    created_at: string;
+    style_name: string;
+    aspect_ratio: string;
+    generated_image_url: string;
+  }>> {
+    const response = await fetch(`${this.API_URL}/history?email=${encodeURIComponent(email)}`);
+    const data = await this.handleResponse(response);
+    return data.generations;
   }
 }

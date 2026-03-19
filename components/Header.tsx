@@ -4,13 +4,14 @@ import { TRANSLATIONS } from '../translations';
 import { ICONS } from '../constants'; // Assumes ICONS has some icon we can use, if not we'll just use emoji
 
 interface HeaderProps {
-  onKeyClick: () => void;
   language: Language;
   credits?: number;
   onBuyCredits?: () => void;
+  onViewHistory?: () => void;
+  userEmail?: string | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ onKeyClick, language, credits = 3, onBuyCredits }) => {
+const Header: React.FC<HeaderProps> = ({ language, credits = 3, onBuyCredits, onViewHistory, userEmail }) => {
   const t = TRANSLATIONS[language];
 
   return (
@@ -18,13 +19,16 @@ const Header: React.FC<HeaderProps> = ({ onKeyClick, language, credits = 3, onBu
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent"></div>
 
       <div className="flex justify-between items-center px-6 md:px-12 pt-4 absolute top-0 w-full">
-        <button
-          onClick={onKeyClick}
-          className="group flex items-center gap-2 text-[10px] text-slate-500 hover:text-gold transition-all uppercase tracking-[0.2em] px-4 py-1.5 rounded-full border border-white/5 hover:border-gold/30"
-        >
-          <div className="w-1.5 h-1.5 rounded-full bg-slate-700 group-hover:bg-gold transition-colors"></div>
-          {t.apiSettings}
-        </button>
+        <div className="flex gap-4 items-center">
+          {userEmail && onViewHistory && (
+            <button
+              onClick={onViewHistory}
+              className="text-[10px] text-slate-400 hover:text-white transition-colors uppercase tracking-widest font-bold"
+            >
+              {t.historyTitle || 'History'}
+            </button>
+          )}
+        </div>
 
         {credits !== undefined && (
           <div className="flex items-center gap-3">

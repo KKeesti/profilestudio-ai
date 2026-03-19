@@ -18,7 +18,8 @@ const App: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [correctionRequest, setCorrectionRequest] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [isConsentChecked, setIsConsentChecked] = useState(false);
+
   const [credits, setCredits] = useState<number>(() => {
     const saved = localStorage.getItem('ps_credits');
     return saved ? parseInt(saved) : 5;
@@ -26,6 +27,14 @@ const App: React.FC = () => {
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('ps_email'));
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [historyItems, setHistoryItems] = useState<Array<{
+    id: string;
+    created_at: string;
+    style_name: string;
+    aspect_ratio: string;
+    generated_image_url: string;
+  }>>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [processing, setProcessing] = useState<ProcessingState>({
     isProcessing: false,
     status: '',
@@ -35,20 +44,6 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const checkKey = async () => {
-      try {
-        // @ts-ignore
-        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-          // @ts-ignore
-          const keyStatus = await window.aistudio.hasSelectedApiKey();
-          setHasKey(keyStatus);
-        } else {
-          setHasKey(!!process.env.API_KEY);
-        }
-      } catch (e) {
-        setHasKey(false);
-      }
-    };
     const refreshCredits = async () => {
       const email = localStorage.getItem('ps_email');
       if (email) {
@@ -61,7 +56,7 @@ const App: React.FC = () => {
       }
     };
 
-    checkKey();
+    refreshCredits();
 
     // Check URL for payment status
     const params = new URLSearchParams(window.location.search);
@@ -77,24 +72,19 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Загружаем историю при переходе на соответствующий экран
+  useEffect(() => {
+    if (step !== AppStep.HISTORY || !userEmail) return;
+    setLoadingHistory(true);
+    GeminiService.getHistory(userEmail)
+      .then(items => setHistoryItems(items))
+      .catch(err => console.error('Failed to load history:', err))
+      .finally(() => setLoadingHistory(false));
+  }, [step, userEmail]);
+
   useEffect(() => {
     localStorage.setItem('ps_credits', credits.toString());
   }, [credits]);
-
-  const handleKeySetup = async () => {
-    try {
-      // @ts-ignore
-      if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-        // @ts-ignore
-        await window.aistudio.openSelectKey();
-        setHasKey(true);
-      } else {
-        alert("Настройка ключа доступна только внутри среды AI Studio.");
-      }
-    } catch (e) {
-      console.error("Key setup error:", e);
-    }
-  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -111,21 +101,8 @@ const App: React.FC = () => {
   const handleGenerate = async (style: PhotoStyle) => {
     if (!originalImage) return;
 
-    // 1. Сначала проверяем ключ (технический шаг)
-    if (!hasKey) {
-      await handleKeySetup();
-      return;
-    }
-
-    // 2. ИСПРАВЛЕНИЕ: Если имейл еще не введен, ОБЯЗАТЕЛЬНО просим его
-    // Это создаст запись в базе данных и даст 5 бесплатных попыток
-    if (!userEmail) {
-      setShowEmailModal(true);
-      return;
-    }
-
-    // 3. Если имейл есть, но в базе 0 кредитов — только тогда оплата
-    if (credits <= 0) {
+    // 1. Если имейл есть, но в базе 0 кредитов — оплата
+    if (userEmail && credits <= 0) {
       setShowPaymentModal(true);
       return;
     }
@@ -143,10 +120,16 @@ const App: React.FC = () => {
     try {
       const base64Data = originalImage.split(',')[1];
       const mimeType = originalImage.split(';')[0].split(':')[1];
-      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, customPrompt, userEmail || 'guest');
+      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, customPrompt, userEmail || null);
       setResultImage(res);
       setStep(AppStep.RESULT);
-      setCredits(prev => Math.max(0, prev - 1));
+      
+      if (userEmail) {
+        setCredits(prev => Math.max(0, prev - 1));
+      } else {
+        // Если email нет, мы показываем модалку СРАЗУ ПОСЛЕ получения результата
+        setShowEmailModal(true);
+      }
     } catch (error: any) {
       console.error("Generation error:", error);
       if (error.message === 'OUT_OF_CREDITS') {
@@ -211,7 +194,10 @@ const App: React.FC = () => {
               {[
                 { id: Language.EN, label: 'English', flag: '🇺🇸' },
                 { id: Language.ET, label: 'Eesti', flag: '🇪🇪' },
-                { id: Language.RU, label: 'Русский', flag: '🇷🇺' }
+                { id: Language.RU, label: 'Русский', flag: '🇷🇺' },
+                { id: Language.LV, label: 'Latviešu', flag: '🇱🇻' },
+                { id: Language.LT, label: 'Lietuvių', flag: '🇱🇹' },
+                { id: Language.FI, label: 'Suomi', flag: '🇫🇮' }
               ].map(lang => (
                 <button
                   key={lang.id}
@@ -243,14 +229,41 @@ const App: React.FC = () => {
                 {t.uploadDesc}
               </p>
             </div>
+            <div className="w-full max-w-sm mx-auto flex items-start gap-4 text-left bg-black/20 p-4 rounded-2xl border border-white/5">
+              <input 
+                type="checkbox" 
+                id="consentCheck" 
+                checked={isConsentChecked}
+                onChange={(e) => setIsConsentChecked(e.target.checked)}
+                className="mt-1 w-5 h-5 rounded border-white/20 text-gold focus:ring-gold bg-black/50 cursor-pointer" 
+              />
+              <label htmlFor="consentCheck" className="text-[10px] text-slate-400 leading-relaxed cursor-pointer">
+                {t.consentText} <a href="/privacy-policy.html" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink}</a>.
+              </label>
+            </div>
+
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="group px-16 py-6 bg-gold text-black rounded-full font-bold text-xl hover:bg-white transition-all transform hover:-translate-y-1 shadow-[0_20px_50px_rgba(194,163,93,0.3)] flex items-center gap-3 active:scale-95"
+              onClick={() => {
+                if (!isConsentChecked) {
+                  alert("Please accept the privacy policy to continue.");
+                  return;
+                }
+                fileInputRef.current?.click();
+              }}
+              className={`group px-16 py-6 rounded-full font-bold text-xl transition-all flex items-center gap-3 ${isConsentChecked ? 'bg-gold text-black hover:bg-white transform hover:-translate-y-1 shadow-[0_20px_50px_rgba(194,163,93,0.3)] active:scale-95' : 'bg-white/5 text-slate-500 cursor-not-allowed'}`}
             >
               {t.startBtn} <ICONS.Magic />
             </button>
+            <div className="w-full max-w-lg mx-auto bg-white/5 p-6 rounded-3xl border border-white/10 mt-4 text-center">
+              <h3 className="text-gold text-[10px] uppercase font-bold tracking-[0.4em] mb-4">How it works</h3>
+              <div className="text-slate-300 text-sm leading-relaxed space-y-2">
+                <p>1. Upload your selfie</p>
+                <p>2. Choose portrait style</p>
+                <p>3. Safely get result to your email</p>
+              </div>
+            </div>
           </div>
         );
 
@@ -299,9 +312,6 @@ const App: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <label className="text-gold text-[10px] uppercase font-bold tracking-[0.4em]">{t.chooseStyleLabel}</label>
-                  {!hasKey && (
-                    <span className="text-[8px] text-red-500 uppercase font-bold bg-red-500/10 px-2 py-0.5 rounded animate-pulse">API KEY REQUIRED</span>
-                  )}
                 </div>
                 <div className="grid gap-3">
                   {[
@@ -365,7 +375,7 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-600 hover:text-white text-[10px] uppercase tracking-[0.5em] font-bold py-4 transition-all hover:translate-x-[-4px]">← {t.backToStyles}</button>
+              <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-600 hover:text-white text-[10px] uppercase tracking-[0.5em] font-bold py-4 transition-all hover:translate-x-[-4px]">← {t.backToUpload || "Back to Upload"}</button>
             </div>
           </div>
         );
@@ -448,10 +458,10 @@ const App: React.FC = () => {
                 </a>
                 <button
                   type="button"
-                  onClick={() => setStep(AppStep.CHOOSE_STYLE)}
+                  onClick={() => setStep(AppStep.UPLOAD)}
                   className="flex-1 py-6 bg-white/5 border border-white/20 text-white rounded-[2rem] font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-3 active:scale-95"
                 >
-                  <ICONS.Rotate /> {t.backToStyles}
+                  <ICONS.Rotate /> {t.backToUpload}
                 </button>
               </div>
             </div>
@@ -459,15 +469,88 @@ const App: React.FC = () => {
             <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-600 hover:text-gold text-[10px] uppercase tracking-[0.5em] font-bold pb-10 transition-colors">NEW SESSION</button>
           </div>
         );
+        
+      case AppStep.HISTORY:
+        return (
+          <div className="max-w-5xl mx-auto flex flex-col items-center gap-10 animate-in fade-in zoom-in-95 duration-1000 mb-20">
+            <div className="text-center space-y-3">
+              <h2 className="text-4xl md:text-5xl font-serif text-white italic">{t.historyTitle || 'My Portraits'}</h2>
+              <p className="text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+                {userEmail ? userEmail : ''}
+              </p>
+            </div>
+
+            {loadingHistory ? (
+              <div className="flex flex-col items-center gap-6 py-20">
+                <div className="w-16 h-16 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
+                <p className="text-slate-500 text-sm uppercase tracking-widest">Loading...</p>
+              </div>
+            ) : historyItems.length === 0 ? (
+              <div className="w-full bg-white/5 border border-white/10 rounded-3xl p-16 text-center">
+                <div className="w-20 h-20 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">📸</div>
+                <p className="text-slate-400 text-lg mb-8">{t.historyEmpty || "You don't have any generated portraits yet."}</p>
+                <button
+                  type="button"
+                  onClick={() => setStep(AppStep.UPLOAD)}
+                  className="px-8 py-4 bg-gold text-black rounded-full font-bold hover:bg-white transition-all transform hover:-translate-y-1 shadow-[0_10px_30px_rgba(194,163,93,0.3)] active:scale-95 inline-flex items-center gap-3"
+                >
+                  <ICONS.Magic /> {t.startBtn}
+                </button>
+              </div>
+            ) : (
+              <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {historyItems.map((item) => (
+                  <div key={item.id} className="group relative rounded-[1.5rem] overflow-hidden border border-white/10 bg-black shadow-xl hover:border-gold/40 transition-all duration-500">
+                    <img
+                      src={item.generated_image_url}
+                      alt={item.style_name}
+                      className="w-full h-auto block group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 gap-3">
+                      <div>
+                        <p className="text-gold text-[9px] uppercase tracking-widest font-bold">{item.style_name?.replace(/_/g, ' ')}</p>
+                        <p className="text-slate-400 text-[8px]">{new Date(item.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Blob-based download — работает на iOS Safari
+                          const byteString = atob(item.generated_image_url.split(',')[1]);
+                          const mime = 'image/jpeg';
+                          const ab = new ArrayBuffer(byteString.length);
+                          const ia = new Uint8Array(ab);
+                          for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                          const blob = new Blob([ab], { type: mime });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `portrait-${item.id}.jpg`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="w-full py-2.5 bg-gold text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <ICONS.Download /> {t.download || 'Download'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-500 hover:text-white text-[10px] uppercase tracking-[0.5em] font-bold transition-all">← {t.backToUpload || "Back to Upload"}</button>
+          </div>
+        );
     }
   };
 
   return (
-    <div className="min-h-screen pb-24 bg-dark font-sans selection:bg-gold selection:text-black scroll-smooth">
+    <div className="min-h-screen flex flex-col pb-24 bg-dark font-sans selection:bg-gold selection:text-black scroll-smooth">
       <Header
-        onKeyClick={handleKeySetup}
         language={language}
         credits={credits}
+        userEmail={userEmail}
+        onViewHistory={() => setStep(AppStep.HISTORY)}
         onBuyCredits={() => {
           if (!userEmail) {
             setShowEmailModal(true);
@@ -476,9 +559,14 @@ const App: React.FC = () => {
           }
         }}
       />
-      <main className="container mx-auto px-6 pt-8 relative z-10">
+      <main className="container mx-auto px-6 pt-8 relative z-10 flex-grow">
         {renderContent()}
       </main>
+
+      <footer className="text-center py-10 opacity-50 hover:opacity-100 transition-opacity mt-auto">
+        <a href="mailto:oleg@lihtneai.ee" className="text-[10px] text-slate-500 hover:text-white uppercase tracking-widest block mb-2">{TRANSLATIONS[language]?.deleteDataMsg || 'To delete your images and data, write to oleg@lihtneai.ee'}</a>
+        <a href="/privacy-policy" target="_blank" className="text-[10px] text-slate-500 hover:text-white uppercase tracking-widest block underline">{TRANSLATIONS[language]?.privacyPolicyLink || 'Privacy Policy'}</a>
+      </footer>
 
       {processing.isProcessing && (
         <div className="fixed inset-0 bg-black/98 backdrop-blur-3xl z-[100] flex items-center justify-center animate-in fade-in duration-500">

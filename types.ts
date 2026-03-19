@@ -8,13 +8,17 @@ export enum AppStep {
   LANGUAGE_SELECT = 'LANGUAGE_SELECT',
   UPLOAD = 'UPLOAD',
   CHOOSE_STYLE = 'CHOOSE_STYLE',
-  RESULT = 'RESULT'
+  RESULT = 'RESULT',
+  HISTORY = 'HISTORY'
 }
 
 export enum Language {
   EN = 'en',
   ET = 'et',
-  RU = 'ru'
+  RU = 'ru',
+  LV = 'lv',
+  LT = 'lt',
+  FI = 'fi'
 }
 
 export enum PhotoStyle {
