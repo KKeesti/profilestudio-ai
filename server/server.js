@@ -94,7 +94,7 @@ app.post('/api/generate', async (req, res) => {
         generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
       });
     }
-    res.json({ image: `data:image/jpeg;base64,${genImg}` });
+    res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
