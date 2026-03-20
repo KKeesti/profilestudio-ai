@@ -11,7 +11,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || '', 
+  process.env.SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
@@ -36,7 +36,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
     if (email && amount > 0) {
       const { data: user } = await supabase.from('users').select('credits, paid_credits').eq('email', email).maybeSingle();
       if (user) {
-        await supabase.from('users').update({ 
+        await supabase.from('users').update({
           credits: (user.credits || 0) + amount,
           paid_credits: (user.paid_credits || 0) + amount
         }).eq('email', email);
@@ -60,7 +60,7 @@ app.post('/api/user/check', async (req, res) => {
     const { data: newUser } = await supabase.from('users').insert({ email, credits: 5 }).select('*').maybeSingle();
     user = newUser;
   }
-  
+
   const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
   res.json({ email, credits, free_generations_used: user?.free_generations_used || 0 });
 });

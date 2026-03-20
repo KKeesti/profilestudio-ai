@@ -66,7 +66,7 @@ const App: React.FC = () => {
       // Очищаем URL от параметров
       window.history.replaceState({}, '', window.location.pathname);
       // Обновляем баланс (может занять пару секунд из-за webhook)
-      setTimeout(refreshCredits, 2000); 
+      setTimeout(refreshCredits, 2000);
     } else if (params.get('payment') === 'cancel') {
       setPaymentStatus('cancel');
       window.history.replaceState({}, '', window.location.pathname);
@@ -141,7 +141,7 @@ const App: React.FC = () => {
       const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, customPrompt, userEmail || null);
       setResultImage(res);
       setStep(AppStep.RESULT);
-      
+
       if (userEmail) {
         setCredits(prev => Math.max(0, prev - 1));
       } else {
@@ -248,12 +248,12 @@ const App: React.FC = () => {
               </p>
             </div>
             <div className="w-full max-w-sm mx-auto flex items-start gap-4 text-left bg-black/20 p-4 rounded-2xl border border-white/5">
-              <input 
-                type="checkbox" 
-                id="consentCheck" 
+              <input
+                type="checkbox"
+                id="consentCheck"
                 checked={isConsentChecked}
                 onChange={(e) => setIsConsentChecked(e.target.checked)}
-                className="mt-1 w-5 h-5 rounded border-white/20 text-gold focus:ring-gold bg-black/50 cursor-pointer" 
+                className="mt-1 w-5 h-5 rounded border-white/20 text-gold focus:ring-gold bg-black/50 cursor-pointer"
               />
               <label htmlFor="consentCheck" className="text-[10px] text-slate-400 leading-relaxed cursor-pointer">
                 {t.consentText} <a href="/privacy-policy.html" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink}</a>.
@@ -487,7 +487,7 @@ const App: React.FC = () => {
             <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-600 hover:text-gold text-[10px] uppercase tracking-[0.5em] font-bold pb-10 transition-colors">NEW SESSION</button>
           </div>
         );
-        
+
       case AppStep.HISTORY:
         return (
           <div className="max-w-5xl mx-auto flex flex-col items-center gap-10 animate-in fade-in zoom-in-95 duration-1000 mb-20">
@@ -665,12 +665,12 @@ const App: React.FC = () => {
           <span className="text-2xl">{paymentStatus === 'success' ? '✅' : '❌'}</span>
           <div>
             <div className="text-sm">
-              {paymentStatus === 'success' 
+              {paymentStatus === 'success'
                 ? (language === Language.RU ? 'Оплата прошла успешно!' : 'Payment successful!')
                 : (language === Language.RU ? 'Оплата отменена' : 'Payment cancelled')}
             </div>
             <div className="text-[10px] opacity-70 uppercase tracking-widest">
-              {paymentStatus === 'success' 
+              {paymentStatus === 'success'
                 ? (language === Language.RU ? 'Кредиты скоро будут зачислены' : 'Credits will be added shortly')
                 : (language === Language.RU ? 'Попробуйте еще раз' : 'Please try again')}
             </div>

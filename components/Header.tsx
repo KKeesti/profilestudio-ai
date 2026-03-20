@@ -6,12 +6,13 @@ import { ICONS } from '../constants'; // Assumes ICONS has some icon we can use,
 interface HeaderProps {
   language: Language;
   credits?: number;
+  paidCredits?: number;
   onBuyCredits?: () => void;
   onViewHistory?: () => void;
   userEmail?: string | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ language, credits = 3, onBuyCredits, onViewHistory, userEmail }) => {
+const Header: React.FC<HeaderProps> = ({ language, credits = 3, paidCredits = 0, onBuyCredits, onViewHistory, userEmail }) => {
   const t = TRANSLATIONS[language];
 
   return (
@@ -20,12 +21,12 @@ const Header: React.FC<HeaderProps> = ({ language, credits = 3, onBuyCredits, on
 
       <div className="flex justify-between items-center px-6 md:px-12 pt-4 absolute top-0 w-full">
         <div className="flex gap-4 items-center">
-          {userEmail && onViewHistory && (
+          {userEmail && paidCredits > 0 && onViewHistory && (
             <button
               onClick={onViewHistory}
-              className="text-[10px] text-slate-400 hover:text-white transition-colors uppercase tracking-widest font-bold"
+              className="flex items-center gap-2 text-[10px] text-gold hover:text-white transition-colors uppercase tracking-widest font-bold bg-gold/10 border border-gold/20 px-4 py-1.5 rounded-full hover:bg-gold/20"
             >
-              {t.historyTitle || 'History'}
+              <span>✨</span> {t.historyTitle || 'My Gallery'}
             </button>
           )}
         </div>
