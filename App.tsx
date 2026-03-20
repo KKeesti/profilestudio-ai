@@ -22,7 +22,8 @@ const App: React.FC = () => {
 
   const [credits, setCredits] = useState<number>(() => {
     const saved = localStorage.getItem('ps_credits');
-    return saved ? parseInt(saved) : 5;
+    const val = saved ? parseInt(saved) : 5;
+    return isNaN(val) ? 5 : val;
   });
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('ps_email'));
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -101,10 +102,27 @@ const App: React.FC = () => {
   const handleGenerate = async (style: PhotoStyle) => {
     if (!originalImage) return;
 
-    // 1. Если имейл есть, но в базе 0 кредитов — оплата
-    if (userEmail && credits <= 0) {
-      setShowPaymentModal(true);
-      return;
+    // 1. Проверяем кредиты. 
+    // ПРОВЕРКА: Если прямо сейчас в памяти 0, пробуем обновить их напоследок перед блокировкой.
+    const currentCredits = Number(credits);
+    console.log('Generate clicked. Current state credits:', currentCredits, 'Email:', userEmail);
+
+    if (userEmail && currentCredits <= 0) {
+      // Пытаемся быстро обновить кредиты с сервера на случай, если они уже зачислены
+      try {
+        const userData = await GeminiService.checkUser(userEmail);
+        if (userData.credits > 0) {
+          setCredits(userData.credits);
+          // Продолжаем генерацию, если кредиты появились
+          console.log('Credits refreshed and found:', userData.credits);
+        } else {
+          setShowPaymentModal(true);
+          return;
+        }
+      } catch (e) {
+        setShowPaymentModal(true);
+        return;
+      }
     }
 
     const t = TRANSLATIONS[language];
@@ -280,7 +298,7 @@ const App: React.FC = () => {
 
             <div className="space-y-10 pb-20">
               <div className="space-y-4">
-                <h2 className="text-4xl md:text-5xl font-serif text-white italic">{t.chooseStyle}</h2>
+                <h2 className="text-4xl md:text-5xl font-serif text-white italic">1. {t.chooseStyle}</h2>
                 <div className="flex items-center gap-4">
                   <div className="h-px w-16 bg-gold/50"></div>
                   <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{t.setupShot}</span>

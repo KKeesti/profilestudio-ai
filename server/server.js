@@ -66,7 +66,10 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
     if (user) {
       await supabase
         .from('users')
-        .update({ credits: user.credits + creditsToAdd })
+        .update({ 
+          credits: (user.credits || 0) + creditsToAdd,
+          paid_credits: (user.paid_credits || 0) + creditsToAdd
+        })
         .eq('email', userEmail);
     }
 
@@ -130,9 +133,7 @@ app.post('/api/user/check', async (req, res) => {
   }
 
   // Р•СЃР»Рё total_available_generations РµС‰Рµ РЅРµ СЂР°СЃСЃС‡РёС‚Р°РЅ, С„РѕР»Р»Р±РµРє РЅР° credits РёР»Рё РІС‹С‡РёСЃР»РµРЅРёРµ
-  const totalCredits = (user.total_available_generations !== undefined && user.total_available_generations !== null) 
-    ? user.total_available_generations 
-    : (user.credits !== undefined ? user.credits : (5 - user.free_generations_used + user.paid_credits));
+  const totalCredits = (5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
 
   res.json({ 
     email: user.email, 
@@ -191,13 +192,11 @@ app.post('/api/generate', async (req, res) => {
     if (email) {
       const { data: user } = await supabase
         .from('users')
-        .select('credits, free_generations_used, paid_credits, total_available_generations')
+        .select('credits, free_generations_used, paid_credits')
         .eq('email', email)
         .single();
       
-      const totalCredits = (user && user.total_available_generations !== undefined && user.total_available_generations !== null) 
-        ? user.total_available_generations 
-        : (user ? (user.credits || (5 - (user.free_generations_used || 0) + (user.paid_credits || 0))) : 0);
+      const totalCredits = (5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
 
       if (!user || totalCredits <= 0) {
         return res.status(403).json({ error: 'OUT_OF_CREDITS' });
@@ -261,13 +260,11 @@ app.post('/api/refine', async (req, res) => {
   try {
     const { data: user } = await supabase
       .from('users')
-      .select('credits, free_generations_used, paid_credits, total_available_generations')
+      .select('credits, free_generations_used, paid_credits')
       .eq('email', email)
       .single();
 
-    const totalCredits = (user && user.total_available_generations !== undefined && user.total_available_generations !== null) 
-      ? user.total_available_generations 
-      : (user ? (user.credits || (5 - (user.free_generations_used || 0) + (user.paid_credits || 0))) : 0);
+    const totalCredits = (5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
 
     if (!user || totalCredits <= 0) {
       return res.status(403).json({ error: 'OUT_OF_CREDITS' });

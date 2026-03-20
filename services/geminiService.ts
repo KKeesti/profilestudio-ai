@@ -1,66 +1,61 @@
-export class GeminiService {
-  private static API_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:3001/api'
-    : '/api';
+import { PhotoStyle } from '../types';
 
-  // Вспомогательный метод для обработки ответов сервера
+export class GeminiService {
+  static API_URL = '/api';
+
   private static async handleResponse(response: Response) {
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown server error' }));
-      throw new Error(error.error || `Server error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'API Request failed');
     }
     return response.json();
   }
 
-  // Проверяет/создает пользователя в базе данных и возвращает его кредиты
-  static async checkUser(email: string): Promise<{ email: string; credits: number }> {
-    const response = await fetch(`${this.API_URL}/user/check`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    return this.handleResponse(response);
-  }
-
-  // Создает Stripe checkout сессию и возвращает URL для оплаты
-  static async createCheckoutSession(email: string, priceId: string, credits: number): Promise<{ id: string; url: string }> {
-    const response = await fetch(`${this.API_URL}/create-checkout-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, priceId, credits })
-    });
-    return this.handleResponse(response);
-  }
-
-  // Генерирует фото через Gemini AI
+  // Порядок аргументов теперь совпадает с вызовом в App.tsx
   static async generateStudioPhoto(
     image: string,
     mimeType: string,
-    style: string,
+    style: PhotoStyle,
     aspectRatio: string,
-    prompt: string,
-    email: string | null
+    prompt: string = '',
+    email: string | null = null
   ): Promise<string> {
     const response = await fetch(`${this.API_URL}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image, mimeType, style, aspectRatio, prompt, email }),
     });
+
     const data = await this.handleResponse(response);
-    return data.image;
+    return data.imageUrl; // Возвращаем только URL строку
   }
 
-  // Уточняет/редактирует сгенерированное фото
-  static async refinePhoto(image: string, correction: string, email: string): Promise<string> {
+  static async refinePhoto(
+    image: string,
+    prompt: string,
+    email: string | null = null
+  ): Promise<string> {
     const response = await fetch(`${this.API_URL}/refine`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image, correction, email }),
+      body: JSON.stringify({ image, prompt, email }),
     });
+
     const data = await this.handleResponse(response);
-    return data.image;
+    return data.imageUrl;
   }
-  // Загружает историю генераций пользователя
+
+  static async checkUser(email: string): Promise<{ 
+    credits: number; 
+    paid_credits: number;
+    free_generations_used: number;
+    email: string;
+  }> {
+    const response = await fetch(`${this.API_URL}/user/check?email=${encodeURIComponent(email)}`);
+    const data = await this.handleResponse(response);
+    return { ...data, email }; // Гарантируем наличие email для App.tsx
+  }
+
   static async getHistory(email: string): Promise<Array<{
     id: string;
     created_at: string;
@@ -70,6 +65,16 @@ export class GeminiService {
   }>> {
     const response = await fetch(`${this.API_URL}/history?email=${encodeURIComponent(email)}`);
     const data = await this.handleResponse(response);
-    return data.generations;
+    return data.generations || [];
+  }
+
+  // Новый метод для обработки оплаты
+  static async createCheckoutSession(email: string, planId: string, credits: number): Promise<{ url: string }> {
+    const response = await fetch(`${this.API_URL}/payment/create-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, planId, credits }),
+    });
+    return this.handleResponse(response);
   }
 }
