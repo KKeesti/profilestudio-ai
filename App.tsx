@@ -113,8 +113,13 @@ const App: React.FC = () => {
   const handleGenerate = async (style: PhotoStyle) => {
     if (!originalImage) return;
 
-    // 1. Проверяем кредиты. 
-    // ПРОВЕРКА: Если прямо сейчас в памяти 0, пробуем обновить их напоследок перед блокировкой.
+    // 0. Запрашиваем Email, если его нет (до генерации)
+    if (!userEmail) {
+      setShowEmailModal(true);
+      return;
+    }
+
+    // 1. Проверяем кредиты
     const currentCredits = Number(credits);
     console.log('Generate clicked. Current state credits:', currentCredits, 'Email:', userEmail);
 
@@ -155,10 +160,6 @@ const App: React.FC = () => {
 
       setCredits(prev => Math.max(0, prev - 1));
       
-      if (!userEmail) {
-        // Если email нет, мы показываем модалку СРАЗУ ПОСЛЕ получения результата
-        setShowEmailModal(true);
-      }
     } catch (error: any) {
       console.error("Generation error:", error);
       if (error.message === 'OUT_OF_CREDITS') {
