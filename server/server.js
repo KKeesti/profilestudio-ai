@@ -92,7 +92,16 @@ app.post('/api/generate', async (req, res) => {
 
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (email && genImg) {
-      await supabase.rpc('decrement_credits', { user_email: email });
+      // Прямое списание кредита в базе
+      const { data: user } = await supabase.from('users').select('free_generations_used, paid_credits').eq('email', email).maybeSingle();
+      if (user) {
+        if ((user.paid_credits || 0) > 0) {
+          await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', email);
+        } else {
+          await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', email);
+        }
+      }
+
       await supabase.from('generations').insert({
         user_email: email, style_name: style, aspect_ratio: aspectRatio,
         generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
@@ -132,7 +141,16 @@ app.post('/api/refine', async (req, res) => {
 
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (email && genImg) {
-      await supabase.rpc('decrement_credits', { user_email: email });
+      // Прямое списание кредита в базе
+      const { data: user } = await supabase.from('users').select('free_generations_used, paid_credits').eq('email', email).maybeSingle();
+      if (user) {
+        if ((user.paid_credits || 0) > 0) {
+          await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', email);
+        } else {
+          await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', email);
+        }
+      }
+
       await supabase.from('generations').insert({
         user_email: email, style_name: 'refinement', aspect_ratio: '9:16',
         generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
