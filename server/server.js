@@ -93,12 +93,23 @@ app.post('/api/generate', async (req, res) => {
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (email && genImg) {
       // Прямое списание кредита в базе
-      const { data: user } = await supabase.from('users').select('free_generations_used, paid_credits').eq('email', email).maybeSingle();
+      const { data: user, error: userError } = await supabase.from('users').select('free_generations_used, paid_credits').eq('email', email).maybeSingle();
+      
+      if (userError) console.error('[DB] Error fetching user:', userError);
+      
       if (user) {
+        console.log(`[DB] Before update - Used: ${user.free_generations_used}, Paid: ${user.paid_credits} for ${email}`);
+        let updateResult;
         if ((user.paid_credits || 0) > 0) {
-          await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', email);
+          updateResult = await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', email);
         } else {
-          await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', email);
+          updateResult = await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', email);
+        }
+        
+        if (updateResult.error) {
+          console.error('[DB] Update error:', updateResult.error);
+        } else {
+          console.log('[DB] Update successful');
         }
       }
 

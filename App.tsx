@@ -25,8 +25,9 @@ const App: React.FC = () => {
 
   const [credits, setCredits] = useState<number>(() => {
     const saved = localStorage.getItem('ps_credits');
-    const val = saved ? parseInt(saved) : 5;
-    return isNaN(val) ? 5 : val;
+    const val = saved ? parseInt(saved, 10) : null;
+    console.log('[Init] Credits from localStorage:', val);
+    return (val !== null && !isNaN(val)) ? val : 5;
   });
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('ps_email'));
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -50,12 +51,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const refreshCredits = async () => {
       const email = localStorage.getItem('ps_email');
+      console.log('[Sync] Refreshing credits for:', email);
       if (email) {
         try {
           const userData = await GeminiService.checkUser(email);
+          console.log('[Sync] Server returned credits:', userData.credits);
           setCredits(userData.credits);
         } catch (e) {
-          console.error("Failed to refresh credits:", e);
+          console.error("[Sync] Failed to refresh credits:", e);
         }
       }
     };
@@ -87,6 +90,7 @@ const App: React.FC = () => {
   }, [step, userEmail]);
 
   useEffect(() => {
+    console.log('[Storage] Saving credits to localStorage:', credits);
     localStorage.setItem('ps_credits', credits.toString());
   }, [credits]);
 
