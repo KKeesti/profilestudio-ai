@@ -51,7 +51,11 @@ export class GeminiService {
     free_generations_used: number;
     email: string;
   }> {
-    const response = await fetch(`${this.API_URL}/user/check?email=${encodeURIComponent(email)}`);
+    const response = await fetch(`${this.API_URL}/user/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
     const data = await this.handleResponse(response);
     return { ...data, email }; // Гарантируем наличие email для App.tsx
   }

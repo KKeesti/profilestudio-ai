@@ -1,4 +1,4 @@
-﻿import { Language, PhotoStyle } from './types';
+import { Language, PhotoStyle } from './types';
 
 export const TRANSLATIONS = {
   [Language.EN]: {
@@ -96,7 +96,7 @@ export const TRANSLATIONS = {
     refinePlaceholder: "Mida soovite muuta? (nt muuda lipsu värvi, rohkem valgust...)",
     refineBtn: "Rakenda muudatused",
     exclusiveAccess: "Eksklusiivne juurdepääs",
-    highEndPhotography: "AI-täiustatud portreede genereerimine",
+    highEndPhotography: "Tipptasemel AI-portreefotograafia",
     selectLanguage: "Vali keel",
     forTinder: "Tinderi jaoks",
     instaStyle: "Instagrami stiil",
@@ -156,8 +156,8 @@ export const TRANSLATIONS = {
     refineTitle: "Доработка деталей",
     refinePlaceholder: "Что вы хотите изменить? (например: изменить цвет галстука, больше света...)",
     refineBtn: "Применить правки",
-    exclusiveAccess: "Exclusive Access",
-    highEndPhotography: "High-End AI-Powered Portrait Photography",
+    exclusiveAccess: "Для профессионалов",
+    highEndPhotography: "ИИ-студия высококлассной портретной съемки",
     selectLanguage: "Выберите язык",
     forTinder: "Для Tinder",
     instaStyle: "Стиль Instagram",

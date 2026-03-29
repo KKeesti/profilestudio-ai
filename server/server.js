@@ -17,7 +17,10 @@ const supabase = createClient(
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MASTER_PROMPT = `IDENTITY PRESERVATION (CRITICAL): 100% face match. Professional 8K portrait.`;
+const MASTER_PROMPT = `IDENTITY PRESERVATION (CRITICAL): 100% face match and facial features. 
+STRICT HAIR PRESERVATION: Preserve hair color and style EXACTLY as in the original photo. 
+Do NOT change hair color unless explicitly requested in the user prompt. 
+Professional 8K portrait.`;
 
 // Webhook must be before express.json()
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -66,12 +69,13 @@ app.post('/api/user/check', async (req, res) => {
 });
 
 app.post('/api/generate', async (req, res) => {
-  const { image, style, aspectRatio, prompt, email } = req.body;
+  const { image, mimeType, style, aspectRatio, prompt, email } = req.body;
+  const isTesting = process.env.FRONTEND_URL === 'http://localhost:3000';
   try {
     if (email) {
       const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
       const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
-      if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+      if (credits <= 0 && !isTesting) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
     }
 
     const response = await ai.models.generateContent({
@@ -80,7 +84,7 @@ app.post('/api/generate', async (req, res) => {
         role: 'user',
         parts: [
           { text: `${MASTER_PROMPT}\nStyle: ${style}. ${prompt || ''}` },
-          { inlineData: { mimeType: 'image/jpeg', data: image } }
+          { inlineData: { mimeType: mimeType || 'image/jpeg', data: image } }
         ]
       }],
       generationConfig: { responseModalities: ['image'] }
@@ -88,9 +92,53 @@ app.post('/api/generate', async (req, res) => {
 
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (email && genImg) {
-      await supabase.rpc('decrement_credits', { user_email: email });
+      if (!isTesting) {
+        await supabase.rpc('decrement_credits', { user_email: email });
+      }
       await supabase.from('generations').insert({
         user_email: email, style_name: style, aspect_ratio: aspectRatio,
+        generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
+      });
+    }
+    res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/refine', async (req, res) => {
+  const { image, prompt, email } = req.body;
+  const isTesting = process.env.FRONTEND_URL === 'http://localhost:3000';
+  try {
+    if (email) {
+      const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+      const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
+      if (credits <= 0 && !isTesting) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+    }
+
+    const mimeMatch = image.match(/^data:(.*?);base64,/);
+    const mimeTypeStr = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const base64Data = image.replace(/^data:.*?;base64,/, '');
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-flash-image-preview',
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${prompt || ''}` },
+          { inlineData: { mimeType: mimeTypeStr, data: base64Data } }
+        ]
+      }],
+      generationConfig: { responseModalities: ['image'] }
+    });
+
+    const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+    if (email && genImg) {
+      if (!isTesting) {
+        await supabase.rpc('decrement_credits', { user_email: email });
+      }
+      await supabase.from('generations').insert({
+        user_email: email, style_name: 'refinement', aspect_ratio: '9:16',
         generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
       });
     }

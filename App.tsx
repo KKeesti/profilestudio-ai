@@ -9,12 +9,15 @@ import { ICONS } from './constants';
 import { TRANSLATIONS } from './translations';
 
 const App: React.FC = () => {
-  const [language, setLanguage] = useState<Language>(Language.RU);
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = localStorage.getItem('ps_language');
+    return saved && Object.values(Language).includes(saved as Language) ? saved as Language : Language.EN;
+  });
   const [step, setStep] = useState<AppStep>(AppStep.LANGUAGE_SELECT);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
-  const [selectedStyle, setSelectedStyle] = useState<PhotoStyle | null>(null);
+  const [selectedStyle, setSelectedStyle] = useState<PhotoStyle | null>(PhotoStyle.CLASSIC_STUDIO);
   const [customPrompt, setCustomPrompt] = useState('');
   const [correctionRequest, setCorrectionRequest] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
@@ -86,6 +89,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('ps_credits', credits.toString());
   }, [credits]);
+
+  useEffect(() => {
+    localStorage.setItem('ps_language', language);
+  }, [language]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -178,6 +185,35 @@ const App: React.FC = () => {
       }
     } finally {
       setProcessing({ isProcessing: false, status: '' });
+    }
+  };
+
+  const handleDownload = () => {
+    if (!resultImage) return;
+    try {
+      const base64Content = resultImage.split(',')[1];
+      const byteCharacters = atob(base64Content);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `profile-studio-ai-portrait.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Download failed:", e);
+      // Fallback
+      const a = document.createElement('a');
+      a.href = resultImage;
+      a.download = "portrait.jpg";
+      a.click();
     }
   };
 
@@ -467,13 +503,12 @@ const App: React.FC = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4">
-                <a
-                  href={resultImage!}
-                  download="profile-studio-portrait.png"
+                <button
+                  onClick={handleDownload}
                   className="flex-2 py-6 bg-white text-black rounded-[2rem] font-black text-lg flex items-center justify-center gap-4 hover:scale-[1.02] transition-all shadow-xl active:scale-95 px-12"
                 >
                   <ICONS.Download /> DOWNLOAD 8K
-                </a>
+                </button>
                 <button
                   type="button"
                   onClick={() => setStep(AppStep.UPLOAD)}
