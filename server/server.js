@@ -75,7 +75,7 @@ app.post('/api/generate', async (req, res) => {
     if (email) {
       const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
       const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
-      if (credits <= 0 && !isTesting) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+      if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
     }
 
     const response = await ai.models.generateContent({
@@ -113,7 +113,7 @@ app.post('/api/refine', async (req, res) => {
     if (email) {
       const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
       const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
-      if (credits <= 0 && !isTesting) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+      if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
     }
 
     const mimeMatch = image.match(/^data:(.*?);base64,/);

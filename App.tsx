@@ -114,7 +114,7 @@ const App: React.FC = () => {
     const currentCredits = Number(credits);
     console.log('Generate clicked. Current state credits:', currentCredits, 'Email:', userEmail);
 
-    if (userEmail && currentCredits <= 0) {
+    if (currentCredits <= 0) {
       // Пытаемся быстро обновить кредиты с сервера на случай, если они уже зачислены
       try {
         const userData = await GeminiService.checkUser(userEmail);
@@ -149,9 +149,9 @@ const App: React.FC = () => {
       setResultImage(res);
       setStep(AppStep.RESULT);
 
-      if (userEmail) {
-        setCredits(prev => Math.max(0, prev - 1));
-      } else {
+      setCredits(prev => Math.max(0, prev - 1));
+      
+      if (!userEmail) {
         // Если email нет, мы показываем модалку СРАЗУ ПОСЛЕ получения результата
         setShowEmailModal(true);
       }
