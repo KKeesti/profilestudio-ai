@@ -92,9 +92,7 @@ app.post('/api/generate', async (req, res) => {
 
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (email && genImg) {
-      if (!isTesting) {
-        await supabase.rpc('decrement_credits', { user_email: email });
-      }
+      await supabase.rpc('decrement_credits', { user_email: email });
       await supabase.from('generations').insert({
         user_email: email, style_name: style, aspect_ratio: aspectRatio,
         generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
@@ -134,9 +132,7 @@ app.post('/api/refine', async (req, res) => {
 
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (email && genImg) {
-      if (!isTesting) {
-        await supabase.rpc('decrement_credits', { user_email: email });
-      }
+      await supabase.rpc('decrement_credits', { user_email: email });
       await supabase.from('generations').insert({
         user_email: email, style_name: 'refinement', aspect_ratio: '9:16',
         generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
