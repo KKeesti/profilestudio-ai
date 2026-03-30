@@ -58,25 +58,42 @@ app.post('/api/user/check', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  let { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+  // Always normalize to lowercase to avoid case-mismatch duplicates
+  const normalEmail = email.trim().toLowerCase();
+
+  let { data: user, error: findError } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
+  if (findError) console.error('[DB] checkUser find error:', findError);
+
   if (!user) {
-    const { data: newUser } = await supabase.from('users').insert({ email, credits: 5 }).select('*').maybeSingle();
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert({ email: normalEmail, free_generations_used: 0, paid_credits: 0 })
+      .select('*')
+      .maybeSingle();
+    if (insertError) console.error('[DB] checkUser insert error:', insertError);
     user = newUser;
   }
 
-  const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
-  res.json({ email, credits, free_generations_used: user?.free_generations_used || 0 });
+  const freeUsed = user?.free_generations_used || 0;
+  const paidCredits = user?.paid_credits || 0;
+  const credits = Math.max(0, 5 - freeUsed) + paidCredits;
+  console.log(`[checkUser] ${normalEmail} → freeUsed=${freeUsed}, paid=${paidCredits}, total=${credits}`);
+  res.json({ email: normalEmail, credits });
 });
 
 app.post('/api/generate', async (req, res) => {
   const { image, mimeType, style, aspectRatio, prompt, email } = req.body;
-  const isTesting = process.env.FRONTEND_URL === 'http://localhost:3000';
-  
+
   if (!email) return res.status(401).json({ error: 'Email is required for generation' });
-  
+
+  const normalEmail = email.trim().toLowerCase();
+
   try {
-    const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
-    const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
+    const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
+    if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+
+    const credits = Math.max(0, 5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
+    console.log(`[generate] ${normalEmail} credits=${credits}`);
     if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
     const response = await ai.models.generateContent({
@@ -92,48 +109,44 @@ app.post('/api/generate', async (req, res) => {
     });
 
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-    if (email && genImg) {
-      // Прямое списание кредита в базе
-      const { data: user, error: userError } = await supabase.from('users').select('free_generations_used, paid_credits').eq('email', email).maybeSingle();
-      
-      if (userError) console.error('[DB] Error fetching user:', userError);
-      
-      if (user) {
-        console.log(`[DB] Before update - Used: ${user.free_generations_used}, Paid: ${user.paid_credits} for ${email}`);
-        let updateResult;
-        if ((user.paid_credits || 0) > 0) {
-          updateResult = await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', email);
-        } else {
-          updateResult = await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', email);
-        }
-        
-        if (updateResult.error) {
-          console.error('[DB] Update error:', updateResult.error);
-        } else {
-          console.log('[DB] Update successful');
-        }
+    if (genImg) {
+      // Deduct credit in DB
+      let updateResult;
+      if ((user.paid_credits || 0) > 0) {
+        updateResult = await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail);
+      } else {
+        updateResult = await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail);
+      }
+      if (updateResult.error) {
+        console.error('[DB] Deduct error:', updateResult.error);
+      } else {
+        console.log(`[DB] Deducted credit for ${normalEmail}`);
       }
 
       await supabase.from('generations').insert({
-        user_email: email, style_name: style, aspect_ratio: aspectRatio,
+        user_email: normalEmail, style_name: style, aspect_ratio: aspectRatio,
         generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
       });
     }
     res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {
+    console.error('[generate] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
-});
+});;
 
 app.post('/api/refine', async (req, res) => {
   const { image, prompt, email } = req.body;
-  const isTesting = process.env.FRONTEND_URL === 'http://localhost:3000';
-  
+
   if (!email) return res.status(401).json({ error: 'Email is required for refinement' });
-  
+
+  const normalEmail = email.trim().toLowerCase();
+
   try {
-    const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
-    const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
+    const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
+    if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+
+    const credits = Math.max(0, 5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
     if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
     const mimeMatch = image.match(/^data:(.*?);base64,/);
