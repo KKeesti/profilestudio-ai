@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppStep, ProcessingState, PhotoStyle, AspectRatio, Language } from './types';
 import Header from './components/Header';
-import EmailModal from './components/EmailModal';
+import EmailGate from './components/EmailGate';
 import PaymentModal from './components/PaymentModal';
 import { GeminiService } from './services/geminiService';
 import { ICONS } from './constants';
@@ -26,11 +26,11 @@ const App: React.FC = () => {
   const [credits, setCredits] = useState<number>(() => {
     const saved = localStorage.getItem('ps_credits');
     const val = saved ? parseInt(saved, 10) : null;
-    console.log('[Init] Credits from localStorage:', val);
-    return (val !== null && !isNaN(val)) ? val : 5;
+    // Only use saved value if email is also saved — otherwise 0
+    const hasEmail = !!localStorage.getItem('ps_email');
+    return (hasEmail && val !== null && !isNaN(val)) ? val : 0;
   });
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('ps_email'));
-  const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [historyItems, setHistoryItems] = useState<Array<{
     id: string;
@@ -90,9 +90,10 @@ const App: React.FC = () => {
   }, [step, userEmail]);
 
   useEffect(() => {
-    console.log('[Storage] Saving credits to localStorage:', credits);
-    localStorage.setItem('ps_credits', credits.toString());
-  }, [credits]);
+    if (userEmail) {
+      localStorage.setItem('ps_credits', credits.toString());
+    }
+  }, [credits, userEmail]);
 
   useEffect(() => {
     localStorage.setItem('ps_language', language);
@@ -112,12 +113,8 @@ const App: React.FC = () => {
 
   const handleGenerate = async (style: PhotoStyle) => {
     if (!originalImage) return;
-
-    // 0. Запрашиваем Email, если его нет (до генерации)
-    if (!userEmail) {
-      setShowEmailModal(true);
-      return;
-    }
+    // userEmail is guaranteed to exist at this point — app doesn't render without it
+    if (!userEmail) return;
 
     // 1. Проверяем кредиты
     const currentCredits = Number(credits);
@@ -602,6 +599,20 @@ const App: React.FC = () => {
     }
   };
 
+  // ─── EMAIL GATE ──────────────────────────────────────────────────────────
+  // If no email in storage → render ONLY the gate, nothing else
+  if (!userEmail) {
+    return (
+      <EmailGate
+        onUnlock={(email, serverCredits) => {
+          setUserEmail(email);
+          setCredits(serverCredits);
+        }}
+      />
+    );
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen flex flex-col pb-24 bg-dark font-sans selection:bg-gold selection:text-black scroll-smooth">
       <Header
@@ -609,13 +620,7 @@ const App: React.FC = () => {
         credits={credits}
         userEmail={userEmail}
         onViewHistory={() => setStep(AppStep.HISTORY)}
-        onBuyCredits={() => {
-          if (!userEmail) {
-            setShowEmailModal(true);
-          } else {
-            setShowPaymentModal(true);
-          }
-        }}
+        onBuyCredits={() => setShowPaymentModal(true)}
       />
       <main className="container mx-auto px-6 pt-8 relative z-10 flex-grow">
         {renderContent()}
@@ -656,42 +661,16 @@ const App: React.FC = () => {
           display: none;
         }
       `}</style>
-      {/* Trial / Payment Modals */}
-      {showEmailModal && (
-        <EmailModal
-          language={language}
-          onClose={() => setShowEmailModal(false)}
-          onSubmit={async (email) => {
-            try {
-              const userData = await GeminiService.checkUser(email);
-              setUserEmail(userData.email);
-              setCredits(userData.credits);
-              localStorage.setItem('ps_email', email);
-              setShowEmailModal(false);
-              if (userData.credits <= 0) {
-                setShowPaymentModal(true);
-              }
-            } catch (error: any) {
-              console.error("User check error:", error);
-              alert("Ошибка при проверке пользователя: " + error.message);
-            }
-          }}
-        />
-      )}
 
       {showPaymentModal && (
         <PaymentModal
           language={language}
           onSelect={async (planId) => {
             if (!userEmail) return;
-
             const creditsToAdd = planId === 'plan_small' ? 20 : 50;
-
             try {
               const session = await GeminiService.createCheckoutSession(userEmail, planId, creditsToAdd);
-              if (session.url) {
-                window.location.href = session.url;
-              }
+              if (session.url) window.location.href = session.url;
             } catch (e: any) {
               alert("Payment Error: " + e.message);
             }

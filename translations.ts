@@ -60,7 +60,7 @@ export const TRANSLATIONS = {
     paidCredits: "Paid credits",
     totalCredits: "Total available generations",
     howItWorks: "How it works: 1. Upload photo 2. Choose style 3. Securely get result to email.",
-    enterEmailToSave: "Your portrait is ready. To save the result and get access to next generations, enter your email.",
+    enterEmailToSave: "To generate a portrait, you need to identify yourself. Enter your email to receive 5 free generations.",
     historyEmpty: "You don't have any generated portraits yet."
   },
   [Language.ET]: {
@@ -121,7 +121,7 @@ export const TRANSLATIONS = {
     paidCredits: "Tasulised krediidid",
     totalCredits: "Kokku saadaval genereerimisi",
     howItWorks: "Kuidas see töötab: 1. Laadi üles foto 2. Vali stiil 3. Saa tulemus meilile.",
-    enterEmailToSave: "Teie portree on valmis. Tulemuse salvestamiseks ja järgmistele genereerimistele juurdepääsu saamiseks sisestage oma e-posti aadress.",
+    enterEmailToSave: "Portree loomiseks peate end tuvastama. Sisestage oma e-posti aadress, et saada 5 tasuta loomist.",
     historyEmpty: "Teil ei ole veel ühtegi genereeritud portreed."
   },
   [Language.RU]: {
@@ -182,7 +182,7 @@ export const TRANSLATIONS = {
     paidCredits: "Платных кредитов",
     totalCredits: "Всего доступно генераций",
     howItWorks: "Как это работает: 1. Загрузите фото 2. Выберите стиль 3. Получите результат",
-    enterEmailToSave: "Ваш портрет готов. Чтобы сохранить результат и получить доступ к следующим генерациям, укажите email.",
+    enterEmailToSave: "Для генерации портрета необходимо войти в систему. Пожалуйста, укажите ваш email.",
     historyEmpty: "У вас пока нет сгенерированных портретов."
   },
   [Language.LV]: {
@@ -243,7 +243,7 @@ export const TRANSLATIONS = {
     paidCredits: "Maksas kredīti",
     totalCredits: "Kopējās aspa pieejamās ģenerācijas",
     howItWorks: "Kā tas darbojas: 1. Augšupielādējiet 2. Izvēlieties 3. Saņemiet",
-    enterEmailToSave: "Jūsu portrets ir gatavs. Lai saglabātu, ievadiet e-pastu.",
+    enterEmailToSave: "Lai ģenerētu portretu, jums jāielogojas. Lūdzu, ievadiet savu e-pastu.",
     historyEmpty: "Jums vēl nav neviena portreta."
   },
   [Language.LT]: {
@@ -304,7 +304,7 @@ export const TRANSLATIONS = {
     paidCredits: "Mokami kreditai",
     totalCredits: "Iš viso prieinama",
     howItWorks: "Kaip tai veikia: 1. Įkelti 2. Pasirinkti 3. Gauti",
-    enterEmailToSave: "Jūsų portretas paruoštas. Norėdami išsaugoti, įveskite el. paštą.",
+    enterEmailToSave: "Norėdami sugeneruoti portretą, turite prisijungti. Įveskite savo el. paštą.",
     historyEmpty: "Jūs neturite portretų."
   },
   [Language.FI]: {
@@ -365,7 +365,7 @@ export const TRANSLATIONS = {
     paidCredits: "Maksettuja krediittejä",
     totalCredits: "Yhteensä saatavilla",
     howItWorks: "Kuinka se toimii: 1. Lataa 2. Valitse 3. Saat",
-    enterEmailToSave: "Muotokuvasi on valmis. Tallenna se syöttämällä sähköpostiosoitteesi.",
+    enterEmailToSave: "Aseta sähköpostiosoitteesi muotokuvan luomiseksi.",
     historyEmpty: "Sinulla ei ole vielä muotokuvia."
   }
 };

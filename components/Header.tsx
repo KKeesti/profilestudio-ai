@@ -31,7 +31,7 @@ const Header: React.FC<HeaderProps> = ({ language, credits = 3, paidCredits = 0,
           )}
         </div>
 
-        {credits !== undefined && (
+        {userEmail && credits !== undefined && (
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5">
               <span className="text-xl">🪙</span>

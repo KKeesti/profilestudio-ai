@@ -71,12 +71,13 @@ app.post('/api/user/check', async (req, res) => {
 app.post('/api/generate', async (req, res) => {
   const { image, mimeType, style, aspectRatio, prompt, email } = req.body;
   const isTesting = process.env.FRONTEND_URL === 'http://localhost:3000';
+  
+  if (!email) return res.status(401).json({ error: 'Email is required for generation' });
+  
   try {
-    if (email) {
-      const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
-      const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
-      if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
-    }
+    const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+    const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
+    if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.1-flash-image-preview',
@@ -127,12 +128,13 @@ app.post('/api/generate', async (req, res) => {
 app.post('/api/refine', async (req, res) => {
   const { image, prompt, email } = req.body;
   const isTesting = process.env.FRONTEND_URL === 'http://localhost:3000';
+  
+  if (!email) return res.status(401).json({ error: 'Email is required for refinement' });
+  
   try {
-    if (email) {
-      const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
-      const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
-      if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
-    }
+    const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+    const credits = (5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
+    if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
     const mimeMatch = image.match(/^data:(.*?);base64,/);
     const mimeTypeStr = mimeMatch ? mimeMatch[1] : 'image/jpeg';
