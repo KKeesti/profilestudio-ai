@@ -47,8 +47,9 @@ export class GeminiService {
 
   static async checkUser(email: string): Promise<{ 
     credits: number; 
-    paid_credits: number;
-    free_generations_used: number;
+    paid_credits?: number;
+    free_generations_used?: number;
+    hasPaid?: boolean;
     email: string;
   }> {
     const response = await fetch(`${this.API_URL}/user/check`, {

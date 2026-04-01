@@ -70,7 +70,10 @@ app.post('/api/user/check', async (req, res) => {
       .insert({ email: normalEmail, free_generations_used: 0, paid_credits: 0 })
       .select('*')
       .maybeSingle();
-    if (insertError) console.error('[DB] checkUser insert error:', insertError);
+    if (insertError) {
+      console.error('[DB] checkUser insert error:', insertError);
+      return res.status(500).json({ error: 'Database error creating user.' });
+    }
     user = newUser;
   }
 
@@ -78,7 +81,11 @@ app.post('/api/user/check', async (req, res) => {
   const paidCredits = user?.paid_credits || 0;
   const credits = Math.max(0, 5 - freeUsed) + paidCredits;
   console.log(`[checkUser] ${normalEmail} → freeUsed=${freeUsed}, paid=${paidCredits}, total=${credits}`);
-  res.json({ email: normalEmail, credits });
+
+  const { count } = await supabase.from('generations').select('*', { count: 'exact', head: true }).eq('user_email', normalEmail);
+  const hasPaid = paidCredits > 0 || (count > 0);
+
+  res.json({ email: normalEmail, credits, hasPaid });
 });
 
 app.post('/api/generate', async (req, res) => {
@@ -110,23 +117,30 @@ app.post('/api/generate', async (req, res) => {
 
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (genImg) {
-      // Deduct credit in DB
+      let usedPaidCredit = false;
       let updateResult;
+      
       if ((user.paid_credits || 0) > 0) {
-        updateResult = await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail);
+        updateResult = await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail).select();
+        usedPaidCredit = true;
       } else {
-        updateResult = await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail);
+        updateResult = await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail).select();
       }
-      if (updateResult.error) {
-        console.error('[DB] Deduct error:', updateResult.error);
+      
+      if (updateResult.error || !updateResult.data || updateResult.data.length === 0) {
+        console.error('[DB] Deduct error or no rows affected:', updateResult.error);
+        return res.status(500).json({ error: 'Database error updating credits. User not found or RLS blocked.' });
       } else {
-        console.log(`[DB] Deducted credit for ${normalEmail}`);
+        console.log(`[DB] Deducted credit for ${normalEmail}. Now used:`, (user.free_generations_used || 0) + 1);
       }
 
-      await supabase.from('generations').insert({
-        user_email: normalEmail, style_name: style, aspect_ratio: aspectRatio,
-        generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
-      });
+      // ONLY save to gallery if a paid credit was used
+      if (usedPaidCredit) {
+        await supabase.from('generations').insert({
+          user_email: normalEmail, style_name: style, aspect_ratio: aspectRatio,
+          generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
+        });
+      }
     }
     res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {
@@ -167,20 +181,28 @@ app.post('/api/refine', async (req, res) => {
 
     const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (email && genImg) {
-      // Прямое списание кредита в базе
+      let usedPaidCredit = false;
       const { data: user } = await supabase.from('users').select('free_generations_used, paid_credits').eq('email', email).maybeSingle();
       if (user) {
+        let updateResult;
         if ((user.paid_credits || 0) > 0) {
-          await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', email);
+          updateResult = await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', email).select();
+          usedPaidCredit = true;
         } else {
-          await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', email);
+          updateResult = await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', email).select();
+        }
+        if (updateResult.error || !updateResult.data || updateResult.data.length === 0) {
+            console.error('[DB] Deduct error Refine:', updateResult.error);
+            return res.status(500).json({ error: 'Database error updating credits.' });
         }
       }
 
-      await supabase.from('generations').insert({
-        user_email: email, style_name: 'refinement', aspect_ratio: '9:16',
-        generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
-      });
+      if (usedPaidCredit) {
+        await supabase.from('generations').insert({
+          user_email: email, style_name: 'refinement', aspect_ratio: '9:16',
+          generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
+        });
+      }
     }
     res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {

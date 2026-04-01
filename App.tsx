@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppStep, ProcessingState, PhotoStyle, AspectRatio, Language } from './types';
 import Header from './components/Header';
-import EmailGate from './components/EmailGate';
+import EmailModal from './components/EmailModal';
 import PaymentModal from './components/PaymentModal';
 import { GeminiService } from './services/geminiService';
 import { ICONS } from './constants';
@@ -13,7 +13,9 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('ps_language');
     return saved && Object.values(Language).includes(saved as Language) ? saved as Language : Language.EN;
   });
-  const [step, setStep] = useState<AppStep>(AppStep.LANGUAGE_SELECT);
+  const [step, setStep] = useState<AppStep>(() => {
+    return localStorage.getItem('ps_consent') === 'true' ? AppStep.UPLOAD : AppStep.LANGUAGE_SELECT;
+  });
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
@@ -21,7 +23,9 @@ const App: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [correctionRequest, setCorrectionRequest] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
-  const [isConsentChecked, setIsConsentChecked] = useState(false);
+  const [isConsentChecked, setIsConsentChecked] = useState(() => localStorage.getItem('ps_consent') === 'true');
+  const [hasGallery, setHasGallery] = useState(false);
+  const [showEmailModalForGenerate, setShowEmailModalForGenerate] = useState(false);
 
   const [credits, setCredits] = useState<number>(() => {
     const saved = localStorage.getItem('ps_credits');
@@ -57,6 +61,7 @@ const App: React.FC = () => {
           const userData = await GeminiService.checkUser(email);
           console.log('[Sync] Server returned credits:', userData.credits);
           setCredits(userData.credits);
+          setHasGallery(userData.hasPaid || false);
         } catch (e) {
           console.error("[Sync] Failed to refresh credits:", e);
         }
@@ -111,33 +116,53 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerate = async (style: PhotoStyle) => {
-    if (!originalImage) return;
-    // userEmail is guaranteed to exist at this point — app doesn't render without it
-    if (!userEmail) return;
-
-    // 1. Проверяем кредиты
-    const currentCredits = Number(credits);
-    console.log('Generate clicked. Current state credits:', currentCredits, 'Email:', userEmail);
-
-    if (currentCredits <= 0) {
-      // Пытаемся быстро обновить кредиты с сервера на случай, если они уже зачислены
-      try {
-        const userData = await GeminiService.checkUser(userEmail);
-        if (userData.credits > 0) {
-          setCredits(userData.credits);
-          // Продолжаем генерацию, если кредиты появились
-          console.log('Credits refreshed and found:', userData.credits);
-        } else {
-          setShowPaymentModal(true);
-          return;
-        }
-      } catch (e) {
-        setShowPaymentModal(true);
-        return;
-      }
+  const handleGenerate = async (style: PhotoStyle, emailOverride?: string) => {
+    console.log('--- handleGenerate started ---');
+    if (!originalImage) {
+      console.log('No original image found - aborting');
+      return;
+    }
+    
+    const activeEmail = emailOverride || userEmail;
+    console.log('Active email:', activeEmail);
+    
+    // Prompt for email ONLY WHEN generating!
+    if (!activeEmail) {
+      console.log('No active email, showing email modal');
+      setShowEmailModalForGenerate(true);
+      return;
     }
 
+    let currentCredits = Number(credits);
+    console.log('Generate clicked. activeEmail:', activeEmail, 'local credits:', currentCredits);
+
+    // Refresh user explicitly before deducting locally
+    try {
+      console.log('Fetching user data...');
+      const userData = await GeminiService.checkUser(activeEmail);
+      console.log('Fetched user data:', userData);
+      currentCredits = userData.credits;
+      setCredits(userData.credits);
+      setHasGallery(userData.hasPaid || false);
+      
+      if (activeEmail !== userEmail) {
+        setUserEmail(activeEmail);
+        localStorage.setItem('ps_email', activeEmail);
+      }
+    } catch (e: any) {
+      console.error('Failed to sync user before generation', e);
+      alert('Network error syncing user: ' + e.message);
+      return;
+    }
+
+    console.log('Credits after sync:', currentCredits);
+    if (currentCredits <= 0) {
+      console.log('User out of credits, showing payment modal');
+      setShowPaymentModal(true);
+      return;
+    }
+
+    console.log('Starting processing state');
     const t = TRANSLATIONS[language];
 
     const statusMap = {
@@ -151,7 +176,7 @@ const App: React.FC = () => {
     try {
       const base64Data = originalImage.split(',')[1];
       const mimeType = originalImage.split(';')[0].split(':')[1];
-      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, customPrompt, userEmail || null);
+      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, customPrompt, activeEmail);
       setResultImage(res);
       setStep(AppStep.RESULT);
 
@@ -246,6 +271,27 @@ const App: React.FC = () => {
                 Select your language / Valige keel / Выберите язык
               </p>
             </div>
+            
+            <div className="w-full max-w-sm mx-auto flex items-start gap-4 text-left bg-black/20 p-4 rounded-2xl border border-white/5">
+              <input
+                type="checkbox"
+                id="consentCheck"
+                checked={isConsentChecked}
+                onChange={(e) => {
+                  setIsConsentChecked(e.target.checked);
+                  if (e.target.checked) {
+                    localStorage.setItem('ps_consent', 'true');
+                  } else {
+                    localStorage.removeItem('ps_consent');
+                  }
+                }}
+                className="mt-1 w-5 h-5 rounded border-white/20 text-gold focus:ring-gold bg-black/50 cursor-pointer"
+              />
+              <label htmlFor="consentCheck" className="text-[10px] text-slate-400 leading-relaxed cursor-pointer select-none">
+                {t.consentText || "I agree to the Terms of Use and"} <a href="/privacy-policy" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink || "Privacy Policy"}</a>.
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
               {[
                 { id: Language.EN, label: 'English', flag: '🇺🇸' },
@@ -259,6 +305,10 @@ const App: React.FC = () => {
                   key={lang.id}
                   type="button"
                   onClick={() => {
+                    if (!isConsentChecked) {
+                      alert("Please accept the terms and privacy policy down below first.");
+                      return;
+                    }
                     setLanguage(lang.id);
                     setStep(AppStep.UPLOAD);
                   }}
@@ -285,30 +335,12 @@ const App: React.FC = () => {
                 {t.uploadDesc}
               </p>
             </div>
-            <div className="w-full max-w-sm mx-auto flex items-start gap-4 text-left bg-black/20 p-4 rounded-2xl border border-white/5">
-              <input
-                type="checkbox"
-                id="consentCheck"
-                checked={isConsentChecked}
-                onChange={(e) => setIsConsentChecked(e.target.checked)}
-                className="mt-1 w-5 h-5 rounded border-white/20 text-gold focus:ring-gold bg-black/50 cursor-pointer"
-              />
-              <label htmlFor="consentCheck" className="text-[10px] text-slate-400 leading-relaxed cursor-pointer">
-                {t.consentText} <a href="/privacy-policy.html" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink}</a>.
-              </label>
-            </div>
 
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
             <button
               type="button"
-              onClick={() => {
-                if (!isConsentChecked) {
-                  alert("Please accept the privacy policy to continue.");
-                  return;
-                }
-                fileInputRef.current?.click();
-              }}
-              className={`group px-16 py-6 rounded-full font-bold text-xl transition-all flex items-center gap-3 ${isConsentChecked ? 'bg-gold text-black hover:bg-white transform hover:-translate-y-1 shadow-[0_20px_50px_rgba(194,163,93,0.3)] active:scale-95' : 'bg-white/5 text-slate-500 cursor-not-allowed'}`}
+              onClick={() => fileInputRef.current?.click()}
+              className="group px-16 py-6 rounded-full font-bold text-xl transition-all flex items-center gap-3 bg-gold text-black hover:bg-white transform hover:-translate-y-1 shadow-[0_20px_50px_rgba(194,163,93,0.3)] active:scale-95"
             >
               {t.startBtn} <ICONS.Magic />
             </button>
@@ -599,19 +631,7 @@ const App: React.FC = () => {
     }
   };
 
-  // ─── EMAIL GATE ──────────────────────────────────────────────────────────
-  // If no email in storage → render ONLY the gate, nothing else
-  if (!userEmail) {
-    return (
-      <EmailGate
-        onUnlock={(email, serverCredits) => {
-          setUserEmail(email);
-          setCredits(serverCredits);
-        }}
-      />
-    );
-  }
-  // ─────────────────────────────────────────────────────────────────────────
+  // No blocked root. We can render main layout directly.
 
   return (
     <div className="min-h-screen flex flex-col pb-24 bg-dark font-sans selection:bg-gold selection:text-black scroll-smooth">
@@ -619,6 +639,7 @@ const App: React.FC = () => {
         language={language}
         credits={credits}
         userEmail={userEmail}
+        hasGallery={hasGallery}
         onViewHistory={() => setStep(AppStep.HISTORY)}
         onBuyCredits={() => setShowPaymentModal(true)}
       />
@@ -676,6 +697,23 @@ const App: React.FC = () => {
             }
           }}
           onClose={() => setShowPaymentModal(false)}
+        />
+      )}
+
+      {showEmailModalForGenerate && (
+        <EmailModal
+          language={language}
+          cancellable={true}
+          onClose={() => setShowEmailModalForGenerate(false)}
+          onSubmit={async (email) => {
+            // First we save locally to immediately display it
+            setUserEmail(email);
+            localStorage.setItem('ps_email', email);
+            setShowEmailModalForGenerate(false);
+            if (selectedStyle) {
+              await handleGenerate(selectedStyle, email);
+            }
+          }}
         />
       )}
 
