@@ -49,6 +49,9 @@ const App: React.FC = () => {
     status: '',
   });
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancel' | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -248,6 +251,62 @@ const App: React.FC = () => {
     setCustomPrompt(prev => prev ? `${prev}, ${tag.toLowerCase()}` : tag);
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Audio = (reader.result as string).split(',')[1];
+          if (userEmail) {
+            setProcessing({ isProcessing: true, status: language === Language.RU ? 'Распознаем голос...' : 'Transcribing voice...' });
+            try {
+              const text = await GeminiService.transcribe(base64Audio, 'audio/webm', userEmail);
+              if (text) {
+                setCorrectionRequest(text);
+                // Автоматически запускаем правку после распознавания
+                setProcessing({ isProcessing: true, status: language === Language.RU ? 'Применяем правки...' : 'Refining...' });
+                const res = await GeminiService.refinePhoto(resultImage!, text, userEmail);
+                setResultImage(res);
+                setCredits(prev => Math.max(0, prev - 1));
+              }
+            } catch (err: any) {
+              alert(err.message === 'VOICE_PREMIUM_ONLY' 
+                ? (language === Language.RU ? 'Голосовые правки доступны только после оплаты' : 'Voice corrections are only available for premium users')
+                : "Transcription error: " + err.message);
+            } finally {
+              setProcessing({ isProcessing: false, status: '' });
+            }
+          }
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Microphone access denied or not supported.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
   const renderContent = () => {
     const t = TRANSLATIONS[language];
     const QUICK_TAGS = [
@@ -288,7 +347,7 @@ const App: React.FC = () => {
                 className="mt-1 w-5 h-5 rounded border-white/20 text-gold focus:ring-gold bg-black/50 cursor-pointer"
               />
               <label htmlFor="consentCheck" className="text-[10px] text-slate-400 leading-relaxed cursor-pointer select-none">
-                {t.consentText || "I agree to the Terms of Use and"} <a href="/privacy-policy" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink || "Privacy Policy"}</a>.
+                {t.consentText || "I agree to the Terms of Use and"} <a href="/terms.html" target="_blank" className="text-gold hover:underline">Terms of Use</a> / <a href="/privacy-policy.html" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink || "Privacy Policy"}</a>.
               </label>
             </div>
 
@@ -518,13 +577,30 @@ const App: React.FC = () => {
                   <ICONS.Magic />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <input
-                    type="text"
-                    value={correctionRequest}
-                    onChange={(e) => setCorrectionRequest(e.target.value)}
-                    placeholder={t.refinePlaceholder}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white focus:border-gold outline-none transition-all placeholder:text-slate-700"
-                  />
+                  <div className="flex-1 flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={correctionRequest}
+                        onChange={(e) => setCorrectionRequest(e.target.value)}
+                        placeholder={t.refinePlaceholder}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white focus:border-gold outline-none transition-all placeholder:text-slate-700"
+                      />
+                    </div>
+                    {hasGallery && (
+                      <button
+                        type="button"
+                        onMouseDown={startRecording}
+                        onMouseUp={stopRecording}
+                        onTouchStart={startRecording}
+                        onTouchEnd={stopRecording}
+                        className={`w-16 flex items-center justify-center rounded-2xl border-2 transition-all ${isRecording ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' : 'bg-gold/10 border-gold/20 text-gold hover:bg-gold hover:text-black'}`}
+                        title={language === Language.RU ? 'Удерживайте для записи голоса' : 'Hold to record voice'}
+                      >
+                        <ICONS.Mic />
+                      </button>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={handleRefine}
@@ -649,7 +725,7 @@ const App: React.FC = () => {
 
       <footer className="text-center py-10 opacity-50 hover:opacity-100 transition-opacity mt-auto">
         <a href="mailto:oleg@lihtneai.ee" className="text-[10px] text-slate-500 hover:text-white uppercase tracking-widest block mb-2">{TRANSLATIONS[language]?.deleteDataMsg || 'To delete your images and data, write to oleg@lihtneai.ee'}</a>
-        <a href="/privacy-policy" target="_blank" className="text-[10px] text-slate-500 hover:text-white uppercase tracking-widest block underline">{TRANSLATIONS[language]?.privacyPolicyLink || 'Privacy Policy'}</a>
+        <a href="/privacy-policy.html" target="_blank" className="text-[10px] text-slate-500 hover:text-white uppercase tracking-widest block underline">{TRANSLATIONS[language]?.privacyPolicyLink || 'Privacy Policy'}</a>
       </footer>
 
       {processing.isProcessing && (

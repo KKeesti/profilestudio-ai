@@ -69,6 +69,9 @@ export class GeminiService {
     generated_image_url: string;
   }>> {
     const response = await fetch(`${this.API_URL}/history?email=${encodeURIComponent(email)}`);
+    if (response.status === 403) {
+      return [];
+    }
     const data = await this.handleResponse(response);
     return data.generations || [];
   }
@@ -81,5 +84,15 @@ export class GeminiService {
       body: JSON.stringify({ email, planId, credits }),
     });
     return this.handleResponse(response);
+  }
+
+  static async transcribe(audio: string, mimeType: string, email: string): Promise<string> {
+    const response = await fetch(`${this.API_URL}/transcribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio, mimeType, email }),
+    });
+    const data = await this.handleResponse(response);
+    return data.text;
   }
 }

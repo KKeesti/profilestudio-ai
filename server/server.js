@@ -1,14 +1,29 @@
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
 const { createClient } = require('@supabase/supabase-js');
-const https = require('https');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
 
 const app = express();
 const port = process.env.PORT || 3001;
+const frontendUrl = process.env.FRONTEND_URL || 'https://shotme.ee';
+const allowedOrigins = new Set([
+  frontendUrl,
+  'https://shotme.ee',
+  'https://www.shotme.ee',
+  'http://localhost:3000'
+].filter(Boolean));
+
+const PLANS = {
+  plan_small: { priceId: process.env.PRICE_20_ID, credits: 20 },
+  plan_large: { priceId: process.env.PRICE_50_ID, credits: 50 }
+};
+
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.0-flash-exp-image-generation';
+const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || '',
@@ -21,6 +36,61 @@ const MASTER_PROMPT = `IDENTITY PRESERVATION (CRITICAL): 100% face match and fac
 STRICT HAIR PRESERVATION: Preserve hair color and style EXACTLY as in the original photo. 
 Do NOT change hair color unless explicitly requested in the user prompt. 
 Professional 8K portrait.`;
+
+const apiBuckets = new Map();
+function apiRateLimit(req, res, next) {
+  const key = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxRequests = 30;
+  const bucket = apiBuckets.get(key) || { count: 0, resetAt: now + windowMs };
+
+  if (now > bucket.resetAt) {
+    bucket.count = 0;
+    bucket.resetAt = now + windowMs;
+  }
+
+  bucket.count += 1;
+  apiBuckets.set(key, bucket);
+
+  if (bucket.count > maxRequests) {
+    return res.status(429).json({ error: 'Too many requests. Please try again soon.' });
+  }
+
+  next();
+}
+
+function normalizeEmail(email) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function assertImagePayload(image, mimeType) {
+  if (!image || typeof image !== 'string') {
+    throw new Error('Image is required');
+  }
+  if (image.length > 18 * 1024 * 1024) {
+    throw new Error('Image is too large');
+  }
+  if (mimeType && !/^image\/(jpeg|jpg|png|webp)$/i.test(mimeType)) {
+    throw new Error('Unsupported image type');
+  }
+}
+
+async function generateImage(parts) {
+  const response = await ai.models.generateContent({
+    model: IMAGE_MODEL,
+    contents: [{ role: 'user', parts }],
+    config: { responseModalities: ['IMAGE'] }
+  });
+
+  const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+  if (!genImg) throw new Error('Gemini did not return an image');
+  return genImg;
+}
 
 // Webhook must be before express.json()
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -49,17 +119,21 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
   res.json({ received: true });
 });
 
-app.use(cors());
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
+  }
+}));
 app.use(express.json({ limit: '50mb' }));
+app.use('/api', apiRateLimit);
 
 app.get('/api/health', (req, res) => res.send('OK'));
 
 app.post('/api/user/check', async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email required' });
-
-  // Always normalize to lowercase to avoid case-mismatch duplicates
-  const normalEmail = email.trim().toLowerCase();
+  const normalEmail = normalizeEmail(email);
+  if (!isValidEmail(normalEmail)) return res.status(400).json({ error: 'Valid email required' });
 
   let { data: user, error: findError } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
   if (findError) console.error('[DB] checkUser find error:', findError);
@@ -80,8 +154,7 @@ app.post('/api/user/check', async (req, res) => {
   const freeUsed = user?.free_generations_used || 0;
   const paidCredits = user?.paid_credits || 0;
   const credits = Math.max(0, 5 - freeUsed) + paidCredits;
-  console.log(`[checkUser] ${normalEmail} → freeUsed=${freeUsed}, paid=${paidCredits}, total=${credits}`);
-
+  
   const { count } = await supabase.from('generations').select('*', { count: 'exact', head: true }).eq('user_email', normalEmail);
   const hasPaid = paidCredits > 0 || (count > 0);
 
@@ -91,136 +164,133 @@ app.post('/api/user/check', async (req, res) => {
 app.post('/api/generate', async (req, res) => {
   const { image, mimeType, style, aspectRatio, prompt, email } = req.body;
 
-  if (!email) return res.status(401).json({ error: 'Email is required for generation' });
-
-  const normalEmail = email.trim().toLowerCase();
+  const normalEmail = normalizeEmail(email);
+  if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
 
   try {
+    assertImagePayload(image, mimeType);
+
     const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
     if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
     const credits = Math.max(0, 5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
-    console.log(`[generate] ${normalEmail} credits=${credits}`);
     if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image-preview',
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: `${MASTER_PROMPT}\nStyle: ${style}. ${prompt || ''}` },
-          { inlineData: { mimeType: mimeType || 'image/jpeg', data: image } }
-        ]
-      }],
-      generationConfig: { responseModalities: ['image'] }
-    });
+    const genImg = await generateImage([
+      { text: `${MASTER_PROMPT}\nStyle: ${style}. ${prompt || ''}` },
+      { inlineData: { mimeType: mimeType || 'image/jpeg', data: image } }
+    ]);
 
-    const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
     if (genImg) {
       let usedPaidCredit = false;
-      let updateResult;
-      
       if ((user.paid_credits || 0) > 0) {
-        updateResult = await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail).select();
+        await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail);
         usedPaidCredit = true;
       } else {
-        updateResult = await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail).select();
-      }
-      
-      if (updateResult.error || !updateResult.data || updateResult.data.length === 0) {
-        console.error('[DB] Deduct error or no rows affected:', updateResult.error);
-        return res.status(500).json({ error: 'Database error updating credits. User not found or RLS blocked.' });
-      } else {
-        console.log(`[DB] Deducted credit for ${normalEmail}. Now used:`, (user.free_generations_used || 0) + 1);
+        await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail);
       }
 
-      // ONLY save to gallery if a paid credit was used
       if (usedPaidCredit) {
         await supabase.from('generations').insert({
           user_email: normalEmail, style_name: style, aspect_ratio: aspectRatio,
           generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
         });
       }
+      res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
+    } else {
+      throw new Error('Gemini failed to generate image');
     }
-    res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {
-    console.error('[generate] Error:', err.message);
+    console.error('[Generate] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
-});;
+});
 
 app.post('/api/refine', async (req, res) => {
   const { image, prompt, email } = req.body;
-
-  if (!email) return res.status(401).json({ error: 'Email is required for refinement' });
-
-  const normalEmail = email.trim().toLowerCase();
+  const normalEmail = normalizeEmail(email);
+  if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
 
   try {
+    assertImagePayload(image);
+
     const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
     if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
-    const credits = Math.max(0, 5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
+    const credits = Math.max(0, 5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
     if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
     const mimeMatch = image.match(/^data:(.*?);base64,/);
     const mimeTypeStr = mimeMatch ? mimeMatch[1] : 'image/jpeg';
     const base64Data = image.replace(/^data:.*?;base64,/, '');
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image-preview',
+    const genImg = await generateImage([
+      { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${prompt || ''}` },
+      { inlineData: { mimeType: mimeTypeStr, data: base64Data } }
+    ]);
+
+    if (genImg) {
+      if ((user?.paid_credits || 0) > 0) {
+        await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail);
+      } else {
+        await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail);
+      }
+      res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
+    } else {
+      throw new Error('Gemini failed to refine image');
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/transcribe', async (req, res) => {
+  const { audio, mimeType, email } = req.body;
+  const normalEmail = normalizeEmail(email);
+  if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
+  if (!audio || typeof audio !== 'string' || audio.length > 8 * 1024 * 1024) {
+    return res.status(400).json({ error: 'Invalid audio payload' });
+  }
+
+  try {
+    const { data: user } = await supabase.from('users').select('paid_credits').eq('email', normalEmail).maybeSingle();
+    const { count } = await supabase.from('generations').select('*', { count: 'exact', head: true }).eq('user_email', normalEmail);
+    const hasPaid = (user?.paid_credits > 0) || (count > 0);
+
+    if (!hasPaid) return res.status(403).json({ error: 'VOICE_PREMIUM_ONLY' });
+
+    const result = await ai.models.generateContent({
+      model: TEXT_MODEL,
       contents: [{
         role: 'user',
         parts: [
-          { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${prompt || ''}` },
-          { inlineData: { mimeType: mimeTypeStr, data: base64Data } }
+          { inlineData: { mimeType: mimeType || 'audio/webm', data: audio } },
+          { text: 'Transcribe this audio to text. Output ONLY the transcription.' }
         ]
-      }],
-      generationConfig: { responseModalities: ['image'] }
+      }]
     });
 
-    const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-    if (email && genImg) {
-      let usedPaidCredit = false;
-      const { data: user } = await supabase.from('users').select('free_generations_used, paid_credits').eq('email', email).maybeSingle();
-      if (user) {
-        let updateResult;
-        if ((user.paid_credits || 0) > 0) {
-          updateResult = await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', email).select();
-          usedPaidCredit = true;
-        } else {
-          updateResult = await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', email).select();
-        }
-        if (updateResult.error || !updateResult.data || updateResult.data.length === 0) {
-            console.error('[DB] Deduct error Refine:', updateResult.error);
-            return res.status(500).json({ error: 'Database error updating credits.' });
-        }
-      }
-
-      if (usedPaidCredit) {
-        await supabase.from('generations').insert({
-          user_email: email, style_name: 'refinement', aspect_ratio: '9:16',
-          generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
-        });
-      }
-    }
-    res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
+    res.json({ text: (result.text || '').trim() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/payment/create-session', async (req, res) => {
-  const { email, planId, credits } = req.body;
-  const priceId = planId === 'plan_small' ? process.env.PRICE_20_ID : process.env.PRICE_50_ID;
+  const { email, planId } = req.body;
+  const normalEmail = normalizeEmail(email);
+  const plan = PLANS[planId];
+  if (!isValidEmail(normalEmail)) return res.status(400).json({ error: 'Valid email required' });
+  if (!plan || !plan.priceId) return res.status(400).json({ error: 'Invalid payment plan' });
+
   try {
     const session = await stripe.checkout.sessions.create({
-      customer_email: email,
-      line_items: [{ price: priceId, quantity: 1 }],
+      customer_email: normalEmail,
+      line_items: [{ price: plan.priceId, quantity: 1 }],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL}/?payment=success`,
-      cancel_url: `${process.env.FRONTEND_URL}/?payment=cancel`,
-      metadata: { credits: String(credits) }
+      success_url: `${frontendUrl}/?payment=success`,
+      cancel_url: `${frontendUrl}/?payment=cancel`,
+      metadata: { planId, credits: String(plan.credits) }
     });
     res.json({ url: session.url });
   } catch (err) {
@@ -229,15 +299,43 @@ app.post('/api/payment/create-session', async (req, res) => {
 });
 
 app.get('/api/history', async (req, res) => {
-  const { email } = req.query;
-  const { data } = await supabase.from('generations').select('*').eq('user_email', email).eq('status', 'success').order('created_at', { ascending: false });
-  res.json({ generations: data || [] });
+  res.status(403).json({ error: 'HISTORY_AUTH_REQUIRED' });
 });
 
 // Static files
-app.use(express.static(path.join(__dirname, '../dist')));
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send('User-agent: *\nAllow: /\nSitemap: https://shotme.ee/sitemap.xml\n');
+});
 
-// Express 5 требует именованный wildcard
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://shotme.ee/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://shotme.ee/privacy-policy.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://shotme.ee/terms.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+</urlset>`);
+});
+
+app.use('/assets', express.static(path.join(__dirname, '../dist/assets'), {
+  immutable: true,
+  maxAge: '1y'
+}));
+app.use(express.static(path.join(__dirname, '../dist'), {
+  maxAge: '1h'
+}));
+
 app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });

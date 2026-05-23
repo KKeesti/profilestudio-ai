@@ -115,7 +115,7 @@ const EmailGate: React.FC<EmailGateProps> = ({ onUnlock }) => {
         </div>
 
         <p className="text-center mt-6">
-          <a href="/privacy-policy" target="_blank" className="text-slate-600 hover:text-slate-400 text-[10px] uppercase tracking-widest underline transition-colors">
+          <a href="/privacy-policy.html" target="_blank" className="text-slate-600 hover:text-slate-400 text-[10px] uppercase tracking-widest underline transition-colors">
             Privacy Policy
           </a>
         </p>
