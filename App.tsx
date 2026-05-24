@@ -581,23 +581,23 @@ const App: React.FC = () => {
             </div>
 
             <div className="w-full max-w-3xl space-y-8">
-              <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-10 rounded-[2.5rem] border border-white/10 space-y-8 shadow-2xl">
-                <div className="flex items-center justify-between">
-                  <label className="text-gold text-[10px] font-bold uppercase tracking-[0.4em]">{t.refineTitle}</label>
-                  <ICONS.Magic />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1 flex gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        value={correctionRequest}
-                        onChange={(e) => setCorrectionRequest(e.target.value)}
-                        placeholder={t.refinePlaceholder}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white focus:border-gold outline-none transition-all placeholder:text-slate-700"
-                      />
-                    </div>
-                    {hasGallery && (
+              {hasGallery && (
+                <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-10 rounded-[2.5rem] border border-white/10 space-y-8 shadow-2xl">
+                  <div className="flex items-center justify-between">
+                    <label className="text-gold text-[10px] font-bold uppercase tracking-[0.4em]">{t.refineTitle}</label>
+                    <ICONS.Magic />
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={correctionRequest}
+                          onChange={(e) => setCorrectionRequest(e.target.value)}
+                          placeholder={t.refinePlaceholder}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white focus:border-gold outline-none transition-all placeholder:text-slate-700"
+                        />
+                      </div>
                       <button
                         type="button"
                         onMouseDown={startRecording}
@@ -609,18 +609,18 @@ const App: React.FC = () => {
                       >
                         <ICONS.Mic />
                       </button>
-                    )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRefine}
+                      disabled={!correctionRequest || processing.isProcessing}
+                      className="px-10 bg-gold text-black rounded-2xl font-black hover:bg-white transition-all disabled:opacity-20 shadow-xl active:scale-95"
+                    >
+                      {t.refineBtn}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleRefine}
-                    disabled={!correctionRequest || processing.isProcessing}
-                    className="px-10 bg-gold text-black rounded-2xl font-black hover:bg-white transition-all disabled:opacity-20 shadow-xl active:scale-95"
-                  >
-                    {t.refineBtn}
-                  </button>
                 </div>
-              </div>
+              )}
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
