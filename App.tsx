@@ -542,7 +542,7 @@ const App: React.FC = () => {
           <div className="max-w-6xl mx-auto flex flex-col items-center gap-12 lg:gap-16 animate-in fade-in zoom-in-95 duration-1000 mb-20">
             <div className="text-center space-y-4">
               <h2 className="text-5xl md:text-6xl font-serif text-white italic">{t.resultTitle}</h2>
-              <div className="inline-block px-6 py-1 bg-gold/5 rounded-full border border-gold/20 text-gold text-[10px] uppercase tracking-[0.5em] font-bold">Professional 8K Render</div>
+              <div className="inline-block px-6 py-1 bg-gold/5 rounded-full border border-gold/20 text-gold text-[10px] uppercase tracking-[0.5em] font-bold">Professional AI Portrait</div>
             </div>
 
             <div className="flex flex-col items-center gap-6 w-full">
@@ -627,7 +627,7 @@ const App: React.FC = () => {
                   onClick={handleDownload}
                   className="flex-2 py-6 bg-white text-black rounded-[2rem] font-black text-lg flex items-center justify-center gap-4 hover:scale-[1.02] transition-all shadow-xl active:scale-95 px-12"
                 >
-                  <ICONS.Download /> DOWNLOAD 8K
+                  <ICONS.Download /> DOWNLOAD
                 </button>
                 <button
                   type="button"

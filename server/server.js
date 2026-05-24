@@ -35,7 +35,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const MASTER_PROMPT = `IDENTITY PRESERVATION (CRITICAL): 100% face match and facial features. 
 STRICT HAIR PRESERVATION: Preserve hair color and style EXACTLY as in the original photo. 
 Do NOT change hair color unless explicitly requested in the user prompt. 
-Professional 8K portrait.
+Professional studio portrait.
 Return exactly one generated image. Do not answer with text only.`;
 
 const apiBuckets = new Map();
