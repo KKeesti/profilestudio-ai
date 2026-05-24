@@ -218,33 +218,43 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownload = () => {
-    if (!resultImage) return;
+  const downloadDataUrl = (dataUrl: string, filename: string) => {
     try {
-      const base64Content = resultImage.split(',')[1];
+      const [header, base64Content] = dataUrl.split(',');
+      if (!base64Content) throw new Error('Invalid image data');
+      const mime = header.match(/^data:(.*?);base64$/)?.[1] || 'image/jpeg';
       const byteCharacters = atob(base64Content);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
       const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+      const blob = new Blob([byteArray], { type: mime });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `profile-studio-ai-portrait.jpg`;
+      a.download = filename;
+      a.rel = 'noopener';
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1500);
     } catch (e) {
       console.error("Download failed:", e);
-      // Fallback
-      const a = document.createElement('a');
-      a.href = resultImage;
-      a.download = "portrait.jpg";
-      a.click();
+      const opened = window.open(dataUrl, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        window.location.href = dataUrl;
+      }
     }
+  };
+
+  const handleDownload = () => {
+    if (!resultImage) return;
+    downloadDataUrl(resultImage, 'profile-studio-ai-portrait.jpg');
   };
 
   const addTag = (tag: string) => {
