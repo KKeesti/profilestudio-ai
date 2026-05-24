@@ -35,7 +35,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const MASTER_PROMPT = `IDENTITY PRESERVATION (CRITICAL): 100% face match and facial features. 
 STRICT HAIR PRESERVATION: Preserve hair color and style EXACTLY as in the original photo. 
 Do NOT change hair color unless explicitly requested in the user prompt. 
-Professional 8K portrait.`;
+Professional 8K portrait.
+Return exactly one generated image. Do not answer with text only.`;
 
 const apiBuckets = new Map();
 function apiRateLimit(req, res, next) {
@@ -81,15 +82,38 @@ function assertImagePayload(image, mimeType) {
 }
 
 async function generateImage(parts) {
-  const response = await ai.models.generateContent({
-    model: IMAGE_MODEL,
-    contents: [{ role: 'user', parts }],
-    config: { responseModalities: ['IMAGE'] }
-  });
+  const models = [
+    IMAGE_MODEL,
+    'gemini-2.5-flash-image',
+    'gemini-3.1-flash-image-preview',
+    'gemini-3-pro-image-preview'
+  ].filter((model, index, list) => model && list.indexOf(model) === index);
 
-  const genImg = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-  if (!genImg) throw new Error('Gemini did not return an image');
-  return genImg;
+  let lastText = '';
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts }],
+        config: { responseModalities: ['TEXT', 'IMAGE'] }
+      });
+
+      const responseParts = response.candidates?.[0]?.content?.parts || [];
+      const genImg = responseParts.find(p => p.inlineData)?.inlineData?.data;
+      if (genImg) return genImg;
+
+      lastText = responseParts.map(p => p.text).filter(Boolean).join(' ').slice(0, 500);
+      console.error(`[Gemini] ${model} returned no image. Text: ${lastText || 'none'}`);
+    } catch (err) {
+      lastError = err;
+      console.error(`[Gemini] ${model} failed:`, err.message);
+    }
+  }
+
+  if (lastError) throw lastError;
+  throw new Error(lastText || 'Gemini did not return an image. Please try another photo or style.');
 }
 
 // Webhook must be before express.json()
