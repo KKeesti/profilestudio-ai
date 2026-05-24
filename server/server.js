@@ -32,10 +32,12 @@ const supabase = createClient(
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MASTER_PROMPT = `IDENTITY PRESERVATION (CRITICAL): 100% face match and facial features. 
-STRICT HAIR PRESERVATION: Preserve hair color and style EXACTLY as in the original photo. 
-Do NOT change hair color unless explicitly requested in the user prompt. 
-Professional studio portrait.
+const MASTER_PROMPT = `IDENTITY PRESERVATION IS THE TOP PRIORITY.
+Preserve every visible person's face as close to the source photo as possible: facial geometry, eye shape, nose, mouth, jawline, cheeks, age, expression, gaze direction, skin texture, distinctive marks, and asymmetry.
+Do NOT beautify, de-age, reshape, replace, stylize, smooth, or idealize faces unless the user explicitly asks for it.
+STRICT HAIR PRESERVATION: preserve hair color, length, volume, hairline, and style exactly as in the original photo unless explicitly requested.
+If the source photo is black and white, keep the result black and white unless the user explicitly asks to colorize it.
+Apply the selected studio style only to lighting, background, framing, and clothing mood while keeping faces and identity unchanged.
 Return exactly one generated image. Do not answer with text only.`;
 
 const apiBuckets = new Map();
