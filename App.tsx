@@ -375,7 +375,7 @@ const App: React.FC = () => {
                   type="button"
                   onClick={() => {
                     if (!isConsentChecked) {
-                      alert("Please accept the terms and privacy policy down below first.");
+                      alert(t.acceptTermsAlert || "Please accept the terms and privacy policy down below first.");
                       return;
                     }
                     setLanguage(lang.id);
