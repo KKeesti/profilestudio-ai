@@ -414,11 +414,11 @@ const App: React.FC = () => {
               {t.startBtn} <ICONS.Magic />
             </button>
             <div className="w-full max-w-lg mx-auto bg-white/5 p-6 rounded-3xl border border-white/10 mt-4 text-center">
-              <h3 className="text-gold text-[10px] uppercase font-bold tracking-[0.4em] mb-4">How it works</h3>
+              <h3 className="text-gold text-[10px] uppercase font-bold tracking-[0.4em] mb-4">{t.howItWorksTitle || 'How it works'}</h3>
               <div className="text-slate-300 text-sm leading-relaxed space-y-2">
-                <p>1. Upload your selfie</p>
-                <p>2. Choose portrait style</p>
-                <p>3. Safely get result to your email</p>
+                <p>{t.stepUpload || '1. Upload a selfie'}</p>
+                <p>{t.stepChoose || '2. Choose a portrait style'}</p>
+                <p>{t.stepGenerate || '3. Generate and download'}</p>
               </div>
             </div>
           </div>
@@ -437,7 +437,7 @@ const App: React.FC = () => {
 
             <div className="space-y-10 pb-20">
               <div className="space-y-4">
-                <h2 className="text-4xl md:text-5xl font-serif text-white italic">1. {t.chooseStyle}</h2>
+                <h2 className="text-4xl md:text-5xl font-serif text-white italic">2. {t.chooseStyle}</h2>
                 <div className="flex items-center gap-4">
                   <div className="h-px w-16 bg-gold/50"></div>
                   <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{t.setupShot}</span>
