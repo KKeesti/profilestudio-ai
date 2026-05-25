@@ -384,7 +384,52 @@ app.post('/api/payment/create-session', async (req, res) => {
 });
 
 app.get('/api/history', async (req, res) => {
-  res.status(403).json({ error: 'HISTORY_AUTH_REQUIRED' });
+  const normalEmail = normalizeEmail(req.query.email);
+  if (!isValidEmail(normalEmail)) return res.status(400).json({ error: 'Valid email required' });
+
+  try {
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('paid_credits')
+      .eq('email', normalEmail)
+      .maybeSingle();
+
+    if (userError) {
+      console.error('[DB] history user lookup error:', userError);
+      return res.status(500).json({ error: 'Database error loading gallery.' });
+    }
+
+    const { count, error: countError } = await supabase
+      .from('generations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_email', normalEmail);
+
+    if (countError) {
+      console.error('[DB] history count error:', countError);
+      return res.status(500).json({ error: 'Database error loading gallery.' });
+    }
+
+    const hasGalleryAccess = (user?.paid_credits || 0) > 0 || (count || 0) > 0;
+    if (!hasGalleryAccess) return res.status(403).json({ error: 'HISTORY_PREMIUM_ONLY' });
+
+    const { data: generations, error: historyError } = await supabase
+      .from('generations')
+      .select('id, created_at, style_name, aspect_ratio, generated_image_url')
+      .eq('user_email', normalEmail)
+      .eq('status', 'success')
+      .order('created_at', { ascending: false })
+      .limit(60);
+
+    if (historyError) {
+      console.error('[DB] history load error:', historyError);
+      return res.status(500).json({ error: 'Database error loading gallery.' });
+    }
+
+    res.json({ generations: generations || [] });
+  } catch (err) {
+    console.error('[History] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Static files
