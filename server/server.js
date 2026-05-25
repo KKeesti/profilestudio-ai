@@ -99,6 +99,63 @@ function markStripeEventProcessed(ids) {
   fs.writeFileSync(STRIPE_EVENTS_FILE, JSON.stringify([...processed].slice(-1000)));
 }
 
+let stripeWebhookQueue = Promise.resolve();
+
+function enqueueStripeWebhook(task) {
+  const next = stripeWebhookQueue.then(task, task);
+  stripeWebhookQueue = next.catch(() => {});
+  return next;
+}
+
+async function handleCheckoutCompleted(event) {
+  const session = event.data.object;
+  const sessionId = session.id;
+  const processed = loadProcessedStripeEvents();
+  if (processed.has(event.id) || processed.has(sessionId)) {
+    return { duplicate: true };
+  }
+
+  const email = normalizeEmail(session.customer_email);
+  const plan = PLANS[session.metadata?.planId];
+  const amount = plan?.credits || 0;
+
+  if (session.payment_status !== 'paid' || !isValidEmail(email) || amount <= 0) {
+    return { ignored: true };
+  }
+
+  const { data: user, error: findError } = await supabase
+    .from('users')
+    .select('credits, paid_credits')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (findError) {
+    console.error('[Stripe] User lookup failed:', findError);
+    throw new Error('User lookup failed');
+  }
+
+  if (!user) return { ignored: true };
+
+  const processedBeforeUpdate = loadProcessedStripeEvents();
+  if (processedBeforeUpdate.has(event.id) || processedBeforeUpdate.has(sessionId)) {
+    return { duplicate: true };
+  }
+
+  const { error: updateError } = await supabase.from('users').update({
+    credits: (user.credits || 0) + amount,
+    paid_credits: (user.paid_credits || 0) + amount
+  }).eq('email', email);
+
+  if (updateError) {
+    console.error('[Stripe] Credit update failed:', updateError);
+    throw new Error('Credit update failed');
+  }
+
+  markStripeEventProcessed([event.id, sessionId]);
+  console.log(`[Stripe] Added ${amount} credits for ${email} (${sessionId})`);
+  return { credited: amount };
+}
+
 async function generateImage(parts) {
   const models = [
     IMAGE_MODEL,
@@ -144,46 +201,16 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    const sessionId = session.id;
-    const processed = loadProcessedStripeEvents();
-    if (processed.has(event.id) || processed.has(sessionId)) {
-      return res.json({ received: true, duplicate: true });
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const result = await enqueueStripeWebhook(() => handleCheckoutCompleted(event));
+      return res.json({ received: true, ...result });
     }
-
-    const email = normalizeEmail(session.customer_email);
-    const plan = PLANS[session.metadata?.planId];
-    const amount = plan?.credits || 0;
-
-    if (session.payment_status === 'paid' && isValidEmail(email) && amount > 0) {
-      const { data: user, error: findError } = await supabase
-        .from('users')
-        .select('credits, paid_credits')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (findError) {
-        console.error('[Stripe] User lookup failed:', findError);
-        return res.status(500).json({ error: 'User lookup failed' });
-      }
-
-      if (user) {
-        const { error: updateError } = await supabase.from('users').update({
-          credits: (user.credits || 0) + amount,
-          paid_credits: (user.paid_credits || 0) + amount
-        }).eq('email', email);
-
-        if (updateError) {
-          console.error('[Stripe] Credit update failed:', updateError);
-          return res.status(500).json({ error: 'Credit update failed' });
-        }
-
-        markStripeEventProcessed([event.id, sessionId]);
-        console.log(`[Stripe] Added ${amount} credits for ${email} (${sessionId})`);
-      }
-    }
+  } catch (err) {
+    console.error('[Stripe] Webhook processing failed:', err.message);
+    return res.status(500).json({ error: err.message });
   }
+
   res.json({ received: true });
 });
 
