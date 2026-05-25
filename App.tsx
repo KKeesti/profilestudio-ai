@@ -52,6 +52,8 @@ const App: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStartedAtRef = useRef(0);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -262,25 +264,38 @@ const App: React.FC = () => {
   };
 
   const startRecording = async () => {
+    if (isRecording || processing.isProcessing) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+      const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
+      recordingStreamRef.current = stream;
       audioChunksRef.current = [];
+      recordingStartedAtRef.current = Date.now();
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const duration = Date.now() - recordingStartedAtRef.current;
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        stream.getTracks().forEach(track => track.stop());
+        recordingStreamRef.current = null;
+
+        if (duration < 500 || audioBlob.size < 512) {
+          alert(language === Language.RU ? 'Скажите фразу чуть дольше и удерживайте кнопку записи.' : 'Hold the voice button a little longer and say the correction again.');
+          return;
+        }
+
         const reader = new FileReader();
         reader.onloadend = async () => {
           const base64Audio = (reader.result as string).split(',')[1];
           if (userEmail) {
             setProcessing({ isProcessing: true, status: language === Language.RU ? 'Распознаем голос...' : 'Transcribing voice...' });
             try {
-              const text = await GeminiService.transcribe(base64Audio, 'audio/webm', userEmail);
+              const text = await GeminiService.transcribe(base64Audio, mimeType, userEmail);
               if (text) {
                 setCorrectionRequest(text);
                 // Автоматически запускаем правку после распознавания
@@ -299,7 +314,6 @@ const App: React.FC = () => {
           }
         };
         reader.readAsDataURL(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
       };
 
       recorder.start();
@@ -311,10 +325,11 @@ const App: React.FC = () => {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
+    recordingStreamRef.current?.getTracks().forEach(track => track.stop());
+    setIsRecording(false);
   };
 
   const renderContent = () => {
@@ -600,10 +615,10 @@ const App: React.FC = () => {
                       </div>
                       <button
                         type="button"
-                        onMouseDown={startRecording}
-                        onMouseUp={stopRecording}
-                        onTouchStart={startRecording}
-                        onTouchEnd={stopRecording}
+                        onPointerDown={startRecording}
+                        onPointerUp={stopRecording}
+                        onPointerCancel={stopRecording}
+                        onPointerLeave={stopRecording}
                         className={`w-16 flex items-center justify-center rounded-2xl border-2 transition-all ${isRecording ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' : 'bg-gold/10 border-gold/20 text-gold hover:bg-gold hover:text-black'}`}
                         title={language === Language.RU ? 'Удерживайте для записи голоса' : 'Hold to record voice'}
                       >

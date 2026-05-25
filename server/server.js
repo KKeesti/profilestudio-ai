@@ -3,6 +3,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 const { createClient } = require('@supabase/supabase-js');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
@@ -23,7 +24,8 @@ const PLANS = {
 };
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
-const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash';
+const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
+const STRIPE_EVENTS_FILE = path.join(__dirname, '.processed-stripe-events.json');
 
 const supabase = createClient(
   process.env.SUPABASE_URL || '',
@@ -83,6 +85,20 @@ function assertImagePayload(image, mimeType) {
   }
 }
 
+function loadProcessedStripeEvents() {
+  try {
+    return new Set(JSON.parse(fs.readFileSync(STRIPE_EVENTS_FILE, 'utf8')));
+  } catch {
+    return new Set();
+  }
+}
+
+function markStripeEventProcessed(ids) {
+  const processed = loadProcessedStripeEvents();
+  ids.filter(Boolean).forEach(id => processed.add(id));
+  fs.writeFileSync(STRIPE_EVENTS_FILE, JSON.stringify([...processed].slice(-1000)));
+}
+
 async function generateImage(parts) {
   const models = [
     IMAGE_MODEL,
@@ -130,15 +146,41 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    const email = session.customer_email;
-    const amount = parseInt(session.metadata?.credits || '0');
-    if (email && amount > 0) {
-      const { data: user } = await supabase.from('users').select('credits, paid_credits').eq('email', email).maybeSingle();
+    const sessionId = session.id;
+    const processed = loadProcessedStripeEvents();
+    if (processed.has(event.id) || processed.has(sessionId)) {
+      return res.json({ received: true, duplicate: true });
+    }
+
+    const email = normalizeEmail(session.customer_email);
+    const plan = PLANS[session.metadata?.planId];
+    const amount = plan?.credits || 0;
+
+    if (session.payment_status === 'paid' && isValidEmail(email) && amount > 0) {
+      const { data: user, error: findError } = await supabase
+        .from('users')
+        .select('credits, paid_credits')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (findError) {
+        console.error('[Stripe] User lookup failed:', findError);
+        return res.status(500).json({ error: 'User lookup failed' });
+      }
+
       if (user) {
-        await supabase.from('users').update({
+        const { error: updateError } = await supabase.from('users').update({
           credits: (user.credits || 0) + amount,
           paid_credits: (user.paid_credits || 0) + amount
         }).eq('email', email);
+
+        if (updateError) {
+          console.error('[Stripe] Credit update failed:', updateError);
+          return res.status(500).json({ error: 'Credit update failed' });
+        }
+
+        markStripeEventProcessed([event.id, sessionId]);
+        console.log(`[Stripe] Added ${amount} credits for ${email} (${sessionId})`);
       }
     }
   }
@@ -277,6 +319,9 @@ app.post('/api/transcribe', async (req, res) => {
   if (!audio || typeof audio !== 'string' || audio.length > 8 * 1024 * 1024) {
     return res.status(400).json({ error: 'Invalid audio payload' });
   }
+  if (mimeType && !/^audio\/(webm|mp4|mpeg|wav|ogg)/i.test(mimeType)) {
+    return res.status(400).json({ error: 'Unsupported audio type' });
+  }
 
   try {
     const { data: user } = await supabase.from('users').select('paid_credits').eq('email', normalEmail).maybeSingle();
@@ -285,19 +330,33 @@ app.post('/api/transcribe', async (req, res) => {
 
     if (!hasPaid) return res.status(403).json({ error: 'VOICE_PREMIUM_ONLY' });
 
-    const result = await ai.models.generateContent({
-      model: TEXT_MODEL,
-      contents: [{
-        role: 'user',
-        parts: [
-          { inlineData: { mimeType: mimeType || 'audio/webm', data: audio } },
-          { text: 'Transcribe this audio to text. Output ONLY the transcription.' }
-        ]
-      }]
-    });
+    const textModels = [TEXT_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash'].filter((model, index, list) => model && list.indexOf(model) === index);
+    let result;
+    let lastError;
+    for (const model of textModels) {
+      try {
+        result = await ai.models.generateContent({
+          model,
+          contents: [{
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: mimeType || 'audio/webm', data: audio } },
+              { text: 'Transcribe this audio to text. Output ONLY the transcription.' }
+            ]
+          }]
+        });
+        break;
+      } catch (err) {
+        lastError = err;
+        console.error(`[Transcribe] ${model} failed:`, err.message);
+      }
+    }
+
+    if (!result && lastError) throw lastError;
 
     res.json({ text: (result.text || '').trim() });
   } catch (err) {
+    console.error('[Transcribe] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
