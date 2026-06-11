@@ -30,6 +30,8 @@ const PLANS = {
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 const STRIPE_EVENTS_FILE = path.join(__dirname, '.processed-stripe-events.json');
+const STATS_EVENTS_FILE = path.join(__dirname, '.shotme-stats-events.jsonl');
+const STATS_TIME_ZONE = process.env.STATS_TIME_ZONE || 'Europe/Tallinn';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || '',
@@ -181,6 +183,131 @@ function sendRouteError(res, label, err) {
   res.status(status).json({ error: status >= 500 && isProduction ? 'Internal server error' : err.message });
 }
 
+function maskEmail(email) {
+  const [name = '', domain = ''] = String(email || '').split('@');
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function appendStatsEvent(type, payload = {}) {
+  const event = {
+    ts: new Date().toISOString(),
+    type,
+    ...payload
+  };
+  fs.appendFile(STATS_EVENTS_FILE, `${JSON.stringify(event)}\n`, err => {
+    if (err) console.error('[Stats] Failed to write event:', err.message);
+  });
+}
+
+function readStatsEvents(start, end) {
+  try {
+    return fs.readFileSync(STATS_EVENTS_FILE, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(event => event && event.ts && event.ts >= start.toISOString() && event.ts < end.toISOString());
+  } catch {
+    return [];
+  }
+}
+
+function timeZoneOffsetMs(timeZone, date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const asUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second)
+  );
+  return asUtc - date.getTime();
+}
+
+function zonedDayToUtc(year, month, day, timeZone) {
+  const guess = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  const offset = timeZoneOffsetMs(timeZone, guess);
+  return new Date(guess.getTime() - offset);
+}
+
+function getStatsRange(dateParam) {
+  const now = new Date();
+  let year;
+  let month;
+  let day;
+
+  if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    [year, month, day] = dateParam.split('-').map(Number);
+  } else {
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: STATS_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(yesterday);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    year = Number(values.year);
+    month = Number(values.month);
+    day = Number(values.day);
+  }
+
+  const start = zonedDayToUtc(year, month, day, STATS_TIME_ZONE);
+  const nextDay = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0));
+  const end = zonedDayToUtc(nextDay.getUTCFullYear(), nextDay.getUTCMonth() + 1, nextDay.getUTCDate(), STATS_TIME_ZONE);
+  const label = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  return { start, end, label };
+}
+
+function isAdminRequest(req) {
+  const configuredToken = process.env.ADMIN_STATS_TOKEN;
+  if (!configuredToken) return false;
+  const auth = req.headers.authorization || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const token = bearer || req.headers['x-admin-token'] || req.query.token;
+  return token === configuredToken;
+}
+
+async function sendPurchaseWebhook(payload) {
+  const webhookUrl = process.env.N8N_PURCHASE_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.N8N_WEBHOOK_SECRET ? { 'X-ShotMe-Secret': process.env.N8N_WEBHOOK_SECRET } : {})
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+  } catch (err) {
+    console.error('[n8n] Purchase webhook failed:', err.message);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function loadProcessedStripeEvents() {
   try {
     return new Set(JSON.parse(fs.readFileSync(STRIPE_EVENTS_FILE, 'utf8')));
@@ -249,6 +376,19 @@ async function handleCheckoutCompleted(event) {
 
   markStripeEventProcessed([event.id, sessionId]);
   console.log(`[Stripe] Added ${amount} credits for ${email} (${sessionId})`);
+  const purchasePayload = {
+    type: 'purchase_completed',
+    email,
+    maskedEmail: maskEmail(email),
+    planId: session.metadata?.planId || '',
+    credits: amount,
+    amountTotal: session.amount_total || 0,
+    currency: session.currency || 'eur',
+    sessionId,
+    createdAt: new Date().toISOString()
+  };
+  appendStatsEvent('purchase_completed', purchasePayload);
+  await sendPurchaseWebhook(purchasePayload);
   return { credited: amount };
 }
 
@@ -346,6 +486,7 @@ app.post('/api/user/check', async (req, res) => {
       return res.status(500).json({ error: 'Database error creating user.' });
     }
     user = newUser;
+    appendStatsEvent('user_created', { email: normalEmail, maskedEmail: maskEmail(normalEmail) });
   }
 
   const freeUsed = user?.free_generations_used || 0;
@@ -393,6 +534,13 @@ app.post('/api/generate', async (req, res) => {
           generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
         });
       }
+      appendStatsEvent('generation_success', {
+        email: normalEmail,
+        maskedEmail: maskEmail(normalEmail),
+        action: 'generate',
+        style,
+        creditType: usedPaidCredit ? 'paid' : 'free'
+      });
       res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
     } else {
       throw new Error('Gemini failed to generate image');
@@ -422,11 +570,19 @@ app.post('/api/refine', async (req, res) => {
     ]);
 
     if (genImg) {
+      let usedPaidCredit = false;
       if ((user?.paid_credits || 0) > 0) {
         await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail);
+        usedPaidCredit = true;
       } else {
         await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail);
       }
+      appendStatsEvent('generation_success', {
+        email: normalEmail,
+        maskedEmail: maskEmail(normalEmail),
+        action: 'refine',
+        creditType: usedPaidCredit ? 'paid' : 'free'
+      });
       res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
     } else {
       throw new Error('Gemini failed to refine image');
@@ -553,6 +709,85 @@ app.get('/api/history', async (req, res) => {
   } catch (err) {
     console.error('[History] Error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/daily-stats', async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(403).json({ error: 'Forbidden' });
+
+  try {
+    const { start, end, label } = getStatsRange(req.query.date);
+    const startIso = start.toISOString();
+    const endIso = end.toISOString();
+
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('email, created_at')
+      .gte('created_at', startIso)
+      .lt('created_at', endIso);
+
+    if (usersError) {
+      console.error('[Stats] Users query failed:', usersError);
+      return res.status(500).json({ error: 'Failed to load user stats' });
+    }
+
+    const sessions = await stripe.checkout.sessions.list({
+      limit: 100,
+      created: {
+        gte: Math.floor(start.getTime() / 1000),
+        lt: Math.floor(end.getTime() / 1000)
+      }
+    });
+
+    const paidSessions = sessions.data.filter(session => session.payment_status === 'paid');
+    const purchaseEmails = new Set(paidSessions.map(session => normalizeEmail(session.customer_email)).filter(Boolean));
+    const newUserEmails = new Set((users || []).map(user => normalizeEmail(user.email)).filter(Boolean));
+    const freeModeUsers = [...newUserEmails].filter(email => !purchaseEmails.has(email)).length;
+    const revenueCents = paidSessions.reduce((sum, session) => sum + (session.amount_total || 0), 0);
+    const purchasedCredits = paidSessions.reduce((sum, session) => sum + Number(session.metadata?.credits || 0), 0);
+
+    const events = readStatsEvents(start, end);
+    const generationEvents = events.filter(event => event.type === 'generation_success');
+    const freeGenerationEvents = generationEvents.filter(event => event.creditType === 'free');
+    const paidGenerationEvents = generationEvents.filter(event => event.creditType === 'paid');
+
+    const stats = {
+      date: label,
+      timeZone: STATS_TIME_ZONE,
+      range: { start: startIso, end: endIso },
+      newUsers: newUserEmails.size,
+      freeModeUsers,
+      purchases: paidSessions.length,
+      revenueEur: revenueCents / 100,
+      purchasedCredits,
+      freeGenerations: freeGenerationEvents.length,
+      paidGenerations: paidGenerationEvents.length,
+      totalGenerations: generationEvents.length,
+      activeFreeUsers: new Set(freeGenerationEvents.map(event => event.email).filter(Boolean)).size,
+      activePaidUsers: new Set(paidGenerationEvents.map(event => event.email).filter(Boolean)).size
+    };
+
+    const text = [
+      `ShotMe статистика за ${stats.date}`,
+      '',
+      `Новые пользователи: ${stats.newUsers}`,
+      `Пользователей в бесплатном режиме: ${stats.freeModeUsers}`,
+      `Покупок: ${stats.purchases}`,
+      `Выручка: ${stats.revenueEur.toFixed(2)} EUR`,
+      `Куплено генераций: ${stats.purchasedCredits}`,
+      '',
+      `Бесплатных генераций: ${stats.freeGenerations}`,
+      `Платных генераций: ${stats.paidGenerations}`,
+      `Всего генераций: ${stats.totalGenerations}`,
+      '',
+      `Активных бесплатных пользователей: ${stats.activeFreeUsers}`,
+      `Активных платных пользователей: ${stats.activePaidUsers}`
+    ].join('\n');
+
+    res.json({ stats, text });
+  } catch (err) {
+    console.error('[Stats] Error:', err.message);
+    res.status(500).json({ error: 'Failed to build stats' });
   }
 });
 

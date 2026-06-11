@@ -17,6 +17,8 @@ dist-ssr
 .env.local
 .env.*.local
 server/.env
+server/.processed-stripe-events.json
+server/.shotme-stats-events.jsonl
 
 # Editor directories and files
 .vscode/*
