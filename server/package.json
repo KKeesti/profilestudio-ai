@@ -12,9 +12,11 @@
   "type": "commonjs",
   "dependencies": {
     "@google/genai": "^1.44.0",
+    "@supabase/supabase-js": "^2.108.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "multer": "^2.1.1"
+    "multer": "^2.1.1",
+    "stripe": "^20.4.1"
   }
 }

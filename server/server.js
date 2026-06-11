@@ -8,9 +8,13 @@ const { GoogleGenAI } = require('@google/genai');
 const { createClient } = require('@supabase/supabase-js');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
 
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
 const app = express();
 const port = process.env.PORT || 3001;
 const frontendUrl = process.env.FRONTEND_URL || 'https://shotme.ee';
+const isProduction = process.env.NODE_ENV === 'production';
+const maxJsonSize = process.env.JSON_BODY_LIMIT || '24mb';
 const allowedOrigins = new Set([
   frontendUrl,
   'https://shotme.ee',
@@ -33,6 +37,29 @@ const supabase = createClient(
 );
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), payment=(), usb=()');
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' https://cdn.tailwindcss.com 'unsafe-inline'",
+    "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://api.stripe.com",
+    "frame-src https://checkout.stripe.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'"
+  ].join('; '));
+  next();
+});
 
 const MASTER_PROMPT = `IDENTITY PRESERVATION IS THE TOP PRIORITY.
 Preserve every visible person's face as close to the source photo as possible: facial geometry, eye shape, nose, mouth, jawline, cheeks, age, expression, gaze direction, skin texture, distinctive marks, and asymmetry.
@@ -73,16 +100,85 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function assertImagePayload(image, mimeType) {
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function getImageMimeFromMagic(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'image/png';
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+  return '';
+}
+
+function parseImagePayload(image, declaredMimeType) {
   if (!image || typeof image !== 'string') {
-    throw new Error('Image is required');
+    throw new HttpError(400, 'Image is required');
   }
-  if (image.length > 18 * 1024 * 1024) {
-    throw new Error('Image is too large');
+
+  let base64Data = image;
+  let dataUrlMime = '';
+  const dataUrlMatch = image.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
+  if (dataUrlMatch) {
+    dataUrlMime = dataUrlMatch[1].toLowerCase();
+    base64Data = dataUrlMatch[2];
   }
-  if (mimeType && !/^image\/(jpeg|jpg|png|webp)$/i.test(mimeType)) {
-    throw new Error('Unsupported image type');
+
+  const normalizedBase64 = base64Data.replace(/\s/g, '');
+  if (!/^[a-z0-9+/]+={0,2}$/i.test(normalizedBase64)) {
+    throw new HttpError(400, 'Invalid image data');
   }
+  if (normalizedBase64.length > 18 * 1024 * 1024) {
+    throw new HttpError(413, 'Image is too large');
+  }
+
+  const buffer = Buffer.from(normalizedBase64, 'base64');
+  if (!buffer.length) {
+    throw new HttpError(400, 'Invalid image data');
+  }
+
+  const detectedMimeType = getImageMimeFromMagic(buffer);
+  if (!detectedMimeType) {
+    throw new HttpError(400, 'Unsupported image type');
+  }
+
+  const mimeType = (dataUrlMime || declaredMimeType || detectedMimeType).toLowerCase().replace('image/jpg', 'image/jpeg');
+  if (mimeType !== detectedMimeType) {
+    throw new HttpError(400, 'Image type does not match the file data');
+  }
+
+  return { base64Data: normalizedBase64, mimeType: detectedMimeType };
+}
+
+function sendRouteError(res, label, err) {
+  const status = err.status || 500;
+  if (status >= 500) {
+    console.error(`[${label}] Error:`, err.message);
+  }
+  res.status(status).json({ error: status >= 500 && isProduction ? 'Internal server error' : err.message });
 }
 
 function loadProcessedStripeEvents() {
@@ -217,11 +313,17 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
 app.use(cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
+    callback(null, false);
   }
 }));
-app.use(express.json({ limit: '50mb' }));
 app.use('/api', apiRateLimit);
+app.use(express.json({ limit: maxJsonSize }));
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request body is too large' });
+  }
+  next(err);
+});
 
 app.get('/api/health', (req, res) => res.send('OK'));
 
@@ -263,7 +365,7 @@ app.post('/api/generate', async (req, res) => {
   if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
 
   try {
-    assertImagePayload(image, mimeType);
+    const imagePayload = parseImagePayload(image, mimeType);
 
     const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
     if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
@@ -273,7 +375,7 @@ app.post('/api/generate', async (req, res) => {
 
     const genImg = await generateImage([
       { text: `${MASTER_PROMPT}\nStyle: ${style}. ${prompt || ''}` },
-      { inlineData: { mimeType: mimeType || 'image/jpeg', data: image } }
+      { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } }
     ]);
 
     if (genImg) {
@@ -296,8 +398,7 @@ app.post('/api/generate', async (req, res) => {
       throw new Error('Gemini failed to generate image');
     }
   } catch (err) {
-    console.error('[Generate] Error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendRouteError(res, 'Generate', err);
   }
 });
 
@@ -307,7 +408,7 @@ app.post('/api/refine', async (req, res) => {
   if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
 
   try {
-    assertImagePayload(image);
+    const imagePayload = parseImagePayload(image);
 
     const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
     if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
@@ -315,13 +416,9 @@ app.post('/api/refine', async (req, res) => {
     const credits = Math.max(0, 5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
     if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
-    const mimeMatch = image.match(/^data:(.*?);base64,/);
-    const mimeTypeStr = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const base64Data = image.replace(/^data:.*?;base64,/, '');
-
     const genImg = await generateImage([
       { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${prompt || ''}` },
-      { inlineData: { mimeType: mimeTypeStr, data: base64Data } }
+      { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } }
     ]);
 
     if (genImg) {
@@ -335,7 +432,7 @@ app.post('/api/refine', async (req, res) => {
       throw new Error('Gemini failed to refine image');
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendRouteError(res, 'Refine', err);
   }
 });
 
