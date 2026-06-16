@@ -27,7 +27,7 @@ const PLANS = {
   plan_large: { priceId: process.env.PRICE_50_ID, credits: 50 }
 };
 
-const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image';
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 const STRIPE_EVENTS_FILE = path.join(__dirname, '.processed-stripe-events.json');
 const STATS_EVENTS_FILE = path.join(__dirname, '.shotme-stats-events.jsonl');
@@ -395,6 +395,7 @@ async function handleCheckoutCompleted(event) {
 async function generateImage(parts) {
   const models = [
     IMAGE_MODEL,
+    'gemini-3.1-flash-image',
     'gemini-2.5-flash-image',
     'gemini-3.1-flash-image-preview',
     'gemini-3-pro-image-preview'
