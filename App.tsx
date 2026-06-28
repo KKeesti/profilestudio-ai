@@ -171,6 +171,7 @@ const App: React.FC = () => {
     const t = TRANSLATIONS[language];
 
     const statusMap = {
+      [PhotoStyle.RESTORE_OLD_PHOTO]: t.processingRestore || 'Restoring and colorizing the old photo...',
       [PhotoStyle.CLASSIC_STUDIO]: t.processingClassic,
       [PhotoStyle.FASHION_EDITORIAL]: t.processingFashion,
       [PhotoStyle.BUSINESS_LUXE]: t.processingBusiness,
@@ -487,6 +488,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="grid gap-3">
                   {[
+                    { id: PhotoStyle.RESTORE_OLD_PHOTO, icon: <ICONS.Restore />, title: t.restoreOldPhoto || 'Restore Old Photo', desc: t.restoreOldPhotoDesc || 'Repair damage and colorize with period-accurate tones.' },
                     { id: PhotoStyle.CLASSIC_STUDIO, icon: <ICONS.Studio />, title: t.classicStudio, desc: t.classicStudioDesc },
                     { id: PhotoStyle.FASHION_EDITORIAL, icon: <ICONS.Fashion />, title: t.fashionEditorial, desc: t.fashionEditorialDesc },
                     { id: PhotoStyle.BUSINESS_LUXE, icon: <ICONS.Luxe />, title: t.businessLuxe, desc: t.businessLuxeDesc }
@@ -510,24 +512,26 @@ const App: React.FC = () => {
               <div className="space-y-6">
                 <label className="text-gold text-[10px] uppercase font-bold tracking-[0.4em]">{t.customPrompt}</label>
                 <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {QUICK_TAGS.map(tag => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => addTag(tag)}
-                        className="px-4 py-2 bg-white/5 hover:bg-gold/10 border border-white/10 rounded-full text-[10px] text-slate-400 hover:text-gold transition-all whitespace-nowrap uppercase tracking-widest font-bold"
-                      >
-                        + {tag}
-                      </button>
-                    ))}
-                  </div>
+                  {selectedStyle !== PhotoStyle.RESTORE_OLD_PHOTO && (
+                    <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                      {QUICK_TAGS.map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => addTag(tag)}
+                          className="px-4 py-2 bg-white/5 hover:bg-gold/10 border border-white/10 rounded-full text-[10px] text-slate-400 hover:text-gold transition-all whitespace-nowrap uppercase tracking-widest font-bold"
+                        >
+                          + {tag}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="relative">
                     <textarea
                       value={customPrompt}
                       onChange={(e) => setCustomPrompt(e.target.value)}
-                      placeholder={t.customPromptPlaceholder}
+                      placeholder={selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorationDetailsPlaceholder || 'Optional: approximate decade, country, uniform, or family context...') : t.customPromptPlaceholder}
                       className="w-full bg-white/5 border border-white/10 rounded-[2rem] p-6 text-white focus:border-gold outline-none h-32 md:h-40 resize-none transition-all placeholder:text-slate-700 text-lg shadow-inner focus:bg-white/[0.07]"
                     />
                   </div>
@@ -539,7 +543,7 @@ const App: React.FC = () => {
                         onClick={() => handleGenerate(selectedStyle)}
                         className="w-full py-7 bg-gold text-black rounded-[2rem] font-black text-2xl flex items-center justify-center gap-5 transition-all hover:bg-white hover:scale-[1.02] shadow-[0_20px_50px_rgba(194,163,93,0.35)] active:scale-95"
                       >
-                        <ICONS.Magic /> {t.generateBtn}
+                        <ICONS.Magic /> {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorePhotoBtn || 'Restore Old Photo') : t.generateBtn}
                       </button>
                       <p className="text-center mt-4 text-[9px] text-slate-600 uppercase tracking-[0.4em] font-bold">Neural Engine Processing ~30s</p>
                     </div>
@@ -556,8 +560,8 @@ const App: React.FC = () => {
         return (
           <div className="max-w-6xl mx-auto flex flex-col items-center gap-12 lg:gap-16 animate-in fade-in zoom-in-95 duration-1000 mb-20">
             <div className="text-center space-y-4">
-              <h2 className="text-5xl md:text-6xl font-serif text-white italic">{t.resultTitle}</h2>
-              <div className="inline-block px-6 py-1 bg-gold/5 rounded-full border border-gold/20 text-gold text-[10px] uppercase tracking-[0.5em] font-bold">Professional AI Portrait</div>
+              <h2 className="text-5xl md:text-6xl font-serif text-white italic">{selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoTitle || 'Restored Photo') : t.resultTitle}</h2>
+              <div className="inline-block px-6 py-1 bg-gold/5 rounded-full border border-gold/20 text-gold text-[10px] uppercase tracking-[0.5em] font-bold">{selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoBadge || 'AI Photo Restoration') : 'Professional AI Portrait'}</div>
             </div>
 
             <div className="flex flex-col items-center gap-6 w-full">
@@ -574,7 +578,7 @@ const App: React.FC = () => {
                   className="w-full h-auto transition-opacity duration-300"
                 />
                 <div className="absolute top-8 right-8 bg-black/60 backdrop-blur-xl border border-white/10 px-5 py-2 rounded-full text-[10px] text-white uppercase tracking-widest font-bold z-20">
-                  {showOriginal ? t.originalPhoto : t.resultTitle}
+                  {showOriginal ? t.originalPhoto : (selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoTitle || 'Restored Photo') : t.resultTitle)}
                 </div>
 
                 {!showOriginal && (

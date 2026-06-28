@@ -71,6 +71,15 @@ Restoring, cleaning up, sharpening, and colorizing old or black-and-white photos
 Apply the selected studio style only to lighting, background, framing, and clothing mood while keeping faces and identity unchanged.
 Return exactly one generated image. Do not answer with text only.`;
 
+const RESTORATION_PROMPT = `PHOTO RESTORATION AND PERIOD COLORIZATION MODE.
+Restore the uploaded old or damaged photograph into a clean, natural color photograph.
+Remove cracks, scratches, dust, stains, folds, glare, fading, scanning artifacts, and discoloration.
+Colorize black-and-white or sepia photos with historically plausible, period-appropriate colors based on clothing, materials, skin tones, setting, and likely era. Avoid modern neon colors and modern fashion colors unless clearly present in the source.
+Preserve the original photograph's composition, camera angle, background, clothing shape, fabric patterns, accessories, body proportions, face geometry, age, expression, gaze, hairstyle, and identity exactly as much as possible.
+Do NOT modernize clothing, add makeup, beautify faces, de-age people, reshape bodies, change facial features, change pose, replace people, add new objects, or turn it into a studio portrait.
+Only reconstruct missing or damaged areas from the local visual context of the original photo.
+Return exactly one restored color image. Do not answer with text only.`;
+
 const apiBuckets = new Map();
 function apiRateLimit(req, res, next) {
   const key = req.ip || req.headers['x-forwarded-for'] || 'unknown';
@@ -515,8 +524,15 @@ app.post('/api/generate', async (req, res) => {
     const credits = Math.max(0, 5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
     if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
+    const isRestorationStyle = style === 'RESTORE_OLD_PHOTO';
+    const generationPrompt = isRestorationStyle
+      ? `${RESTORATION_PROMPT}
+Additional historical context from user, if any: ${prompt || 'none'}`
+      : `${MASTER_PROMPT}
+Style: ${style}. ${prompt || ''}`;
+
     const genImg = await generateImage([
-      { text: `${MASTER_PROMPT}\nStyle: ${style}. ${prompt || ''}` },
+      { text: generationPrompt },
       { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } }
     ]);
 
