@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [correctionRequest, setCorrectionRequest] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
   const [isConsentChecked, setIsConsentChecked] = useState(() => localStorage.getItem('ps_consent') === 'true');
+  const [showConsentHint, setShowConsentHint] = useState(false);
   const [hasGallery, setHasGallery] = useState(false);
   const [showEmailModalForGenerate, setShowEmailModalForGenerate] = useState(false);
 
@@ -357,24 +358,41 @@ const App: React.FC = () => {
               </p>
             </div>
             
-            <div className="w-full max-w-sm mx-auto flex items-start gap-4 text-left bg-black/20 p-4 rounded-2xl border border-white/5">
+            <div
+              className={`relative w-full max-w-lg mx-auto flex items-start gap-4 text-left p-5 sm:p-6 rounded-[1.75rem] border transition-all duration-300 ${showConsentHint ? 'bg-red-500/10 border-red-400/80 shadow-[0_0_0_3px_rgba(248,113,113,0.22),0_0_34px_rgba(248,113,113,0.24)] animate-pulse' : 'bg-black/25 border-white/10'}`}
+            >
+              {showConsentHint && (
+                <div className="absolute -top-4 left-6 rounded-full bg-red-500 px-4 py-1.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg">
+                  {t.consentHint || 'Tick this box to continue'}
+                </div>
+              )}
               <input
                 type="checkbox"
                 id="consentCheck"
                 checked={isConsentChecked}
+                aria-invalid={showConsentHint && !isConsentChecked}
+                aria-describedby={showConsentHint ? 'consentHint' : undefined}
                 onChange={(e) => {
                   setIsConsentChecked(e.target.checked);
                   if (e.target.checked) {
+                    setShowConsentHint(false);
                     localStorage.setItem('ps_consent', 'true');
                   } else {
                     localStorage.removeItem('ps_consent');
                   }
                 }}
-                className="mt-1 w-5 h-5 rounded border-white/20 text-gold focus:ring-gold bg-black/50 cursor-pointer"
+                className={`mt-1 h-8 w-8 shrink-0 rounded-lg border-2 bg-black/70 accent-[#c2a35d] cursor-pointer transition-all focus:outline-none focus:ring-4 ${showConsentHint ? 'border-red-400 ring-4 ring-red-400/30' : 'border-white/50 focus:ring-gold/35'}`}
               />
-              <label htmlFor="consentCheck" className="text-[10px] text-slate-400 leading-relaxed cursor-pointer select-none">
-                {t.consentText || "I agree to the Terms of Use and"} <a href="/terms.html" target="_blank" className="text-gold hover:underline">Terms of Use</a> / <a href="/privacy-policy.html" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink || "Privacy Policy"}</a>.
-              </label>
+              <div className="space-y-2">
+                <label htmlFor="consentCheck" className="block text-sm sm:text-[13px] text-slate-300 leading-6 cursor-pointer select-none">
+                  {t.consentText || "I agree to the Terms of Use and"} <a href="/terms.html" target="_blank" className="text-gold hover:underline">Terms of Use</a> / <a href="/privacy-policy.html" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink || "Privacy Policy"}</a>.
+                </label>
+                {showConsentHint && !isConsentChecked && (
+                  <p id="consentHint" className="text-sm font-bold text-red-200">
+                    {t.consentHint || 'Tick this box to continue'}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
@@ -391,9 +409,11 @@ const App: React.FC = () => {
                   type="button"
                   onClick={() => {
                     if (!isConsentChecked) {
-                      alert(t.acceptTermsAlert || "Please accept the terms and privacy policy down below first.");
+                      setShowConsentHint(true);
+                      window.setTimeout(() => document.getElementById('consentCheck')?.focus(), 0);
                       return;
                     }
+                    setShowConsentHint(false);
                     setLanguage(lang.id);
                     setStep(AppStep.UPLOAD);
                   }}
