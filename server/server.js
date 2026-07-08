@@ -7,6 +7,7 @@ const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 const { createClient } = require('@supabase/supabase-js');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
+const WebSocket = require('ws');
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 
@@ -23,6 +24,12 @@ const allowedOrigins = new Set([
 ].filter(Boolean));
 
 const FREE_TRIAL_LIMIT = 10;
+const ANONYMOUS_DAILY_GENERATION_LIMIT = Number(process.env.ANONYMOUS_DAILY_GENERATION_LIMIT || 12);
+const MAX_ACTIVE_GENERATIONS_PER_KEY = Number(process.env.MAX_ACTIVE_GENERATIONS_PER_KEY || 2);
+const MAX_PROMPT_LENGTH = Number(process.env.MAX_PROMPT_LENGTH || 800);
+const MAX_REFINE_PROMPT_LENGTH = Number(process.env.MAX_REFINE_PROMPT_LENGTH || 500);
+const ALLOWED_STYLES = new Set(['RESTORE_OLD_PHOTO', 'CLASSIC_STUDIO', 'FASHION_EDITORIAL', 'BUSINESS_LUXE']);
+const ALLOWED_ASPECT_RATIOS = new Set(['9:16', '16:9']);
 
 const PLANS = {
   plan_small: { priceId: process.env.PRICE_20_ID, credits: 20 },
@@ -37,7 +44,8 @@ const STATS_TIME_ZONE = process.env.STATS_TIME_ZONE || 'Europe/Tallinn';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  { realtime: { transport: WebSocket } }
 );
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -49,6 +57,11 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options', 'DENY');
+  if (isProduction) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), payment=(), usb=()');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
@@ -82,9 +95,62 @@ Do NOT modernize clothing, add makeup, beautify faces, de-age people, reshape bo
 Only reconstruct missing or damaged areas from the local visual context of the original photo.
 Return exactly one restored color image. Do not answer with text only.`;
 
+const generationBuckets = new Map();
+const activeGenerationCounts = new Map();
+
+function getClientKey(req) {
+  return String(req.ip || req.headers['x-forwarded-for'] || 'unknown').split(',')[0].trim() || 'unknown';
+}
+
+function takeWindowBudget(map, key, maxCount, windowMs) {
+  const now = Date.now();
+  const bucket = map.get(key) || { count: 0, resetAt: now + windowMs };
+
+  if (now > bucket.resetAt) {
+    bucket.count = 0;
+    bucket.resetAt = now + windowMs;
+  }
+
+  if (bucket.count >= maxCount) {
+    return { allowed: false, resetAt: bucket.resetAt };
+  }
+
+  bucket.count += 1;
+  map.set(key, bucket);
+  return { allowed: true, resetAt: bucket.resetAt };
+}
+
+function takeGenerationSlot(key) {
+  const active = activeGenerationCounts.get(key) || 0;
+  if (active >= MAX_ACTIVE_GENERATIONS_PER_KEY) return false;
+  activeGenerationCounts.set(key, active + 1);
+  return true;
+}
+
+function releaseGenerationSlot(key) {
+  const active = activeGenerationCounts.get(key) || 0;
+  if (active <= 1) {
+    activeGenerationCounts.delete(key);
+  } else {
+    activeGenerationCounts.set(key, active - 1);
+  }
+}
+
+function normalizeUserPrompt(prompt, maxLength = MAX_PROMPT_LENGTH) {
+  if (prompt === undefined || prompt === null) return '';
+  if (typeof prompt !== 'string') {
+    throw new HttpError(400, 'Prompt must be text');
+  }
+  const normalized = prompt.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (normalized.length > maxLength) {
+    throw new HttpError(400, 'Prompt is too long');
+  }
+  return normalized;
+}
+
 const apiBuckets = new Map();
 function apiRateLimit(req, res, next) {
-  const key = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const key = getClientKey(req);
   const now = Date.now();
   const windowMs = 60 * 1000;
   const maxRequests = 30;
@@ -535,9 +601,30 @@ app.post('/api/generate', async (req, res) => {
   const hasEmail = Boolean(normalEmail);
   if (email && !isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
 
+  const clientKey = getClientKey(req);
+  const generationKey = hasEmail ? `email:${normalEmail}` : `anonymous:${clientKey}`;
+  let generationSlotTaken = false;
+
   try {
+    if (!ALLOWED_STYLES.has(style)) throw new HttpError(400, 'Unsupported style');
+    if (!ALLOWED_ASPECT_RATIOS.has(aspectRatio)) throw new HttpError(400, 'Unsupported aspect ratio');
+
+    const safePrompt = normalizeUserPrompt(prompt);
     const imagePayload = parseImagePayload(image, mimeType);
     let user = null;
+
+    if (!hasEmail) {
+      const budget = takeWindowBudget(generationBuckets, generationKey, ANONYMOUS_DAILY_GENERATION_LIMIT, 24 * 60 * 60 * 1000);
+      if (!budget.allowed) {
+        res.setHeader('Retry-After', String(Math.ceil((budget.resetAt - Date.now()) / 1000)));
+        throw new HttpError(429, 'Free daily limit reached. Please try again later or continue with email.');
+      }
+    }
+
+    if (!takeGenerationSlot(generationKey)) {
+      throw new HttpError(429, 'Another generation is already running. Please wait a moment.');
+    }
+    generationSlotTaken = true;
 
     if (hasEmail) {
       const { data } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
@@ -551,9 +638,9 @@ app.post('/api/generate', async (req, res) => {
     const isRestorationStyle = style === 'RESTORE_OLD_PHOTO';
     const generationPrompt = isRestorationStyle
       ? `${RESTORATION_PROMPT}
-Additional historical context from user, if any: ${prompt || 'none'}`
+Additional historical context from user, if any: ${safePrompt || 'none'}`
       : `${MASTER_PROMPT}
-Style: ${style}. ${prompt || ''}`;
+Style: ${style}. ${safePrompt || ''}`;
 
     const genImg = await generateImage([
       { text: generationPrompt },
@@ -593,6 +680,8 @@ Style: ${style}. ${prompt || ''}`;
     }
   } catch (err) {
     sendRouteError(res, 'Generate', err);
+  } finally {
+    if (generationSlotTaken) releaseGenerationSlot(generationKey);
   }
 });
 
@@ -602,6 +691,7 @@ app.post('/api/refine', async (req, res) => {
   if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
 
   try {
+    const safePrompt = normalizeUserPrompt(prompt, MAX_REFINE_PROMPT_LENGTH);
     const imagePayload = parseImagePayload(image);
 
     const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
@@ -611,7 +701,7 @@ app.post('/api/refine', async (req, res) => {
     if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
     const genImg = await generateImage([
-      { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${prompt || ''}` },
+      { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${safePrompt || ''}` },
       { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } }
     ]);
 
