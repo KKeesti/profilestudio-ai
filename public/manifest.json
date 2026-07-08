@@ -1,16 +1,65 @@
 {
   "name": "ShotMe.ee",
   "short_name": "ShotMe",
-  "description": "AI photo studio for professional portraits.",
-  "start_url": "/",
+  "description": "AI photo studio for portraits and old photo restoration.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "background_color": "#05070a",
   "theme_color": "#05070a",
+  "orientation": "portrait-primary",
+  "categories": ["photo", "productivity", "utilities"],
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Create portrait",
+      "short_name": "Portrait",
+      "description": "Upload a photo and generate a portrait.",
+      "url": "/?action=portrait",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Restore old photo",
+      "short_name": "Restore",
+      "description": "Restore and colorize an old photo.",
+      "url": "/?action=restore",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
