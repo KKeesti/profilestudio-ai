@@ -12,7 +12,7 @@ interface HeaderProps {
   userEmail?: string | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ language, credits = 3, hasGallery = false, onBuyCredits, onViewHistory, userEmail }) => {
+const Header: React.FC<HeaderProps> = ({ language, credits = 0, hasGallery = false, onBuyCredits, onViewHistory, userEmail }) => {
   const t = TRANSLATIONS[language];
 
   return (
@@ -31,15 +31,15 @@ const Header: React.FC<HeaderProps> = ({ language, credits = 3, hasGallery = fal
           )}
         </div>
 
-        {userEmail && credits !== undefined && (
+        {credits !== undefined && (
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5">
               <span className="text-xl">🪙</span>
               <span className="text-[10px] text-white uppercase tracking-widest font-bold">
-                {t.creditsLeft}: <span className="text-gold">{credits}</span>
+                {userEmail ? t.creditsLeft : (t.freeCredits || t.creditsLeft)}: <span className="text-gold">{credits}</span>
               </span>
             </div>
-            {onBuyCredits && (
+            {userEmail && onBuyCredits && (
               <button
                 onClick={onBuyCredits}
                 className="bg-gold text-black text-[10px] uppercase font-bold tracking-widest px-5 py-1.5 rounded-full hover:bg-white transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(194,163,93,0.3)]"

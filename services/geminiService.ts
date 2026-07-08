@@ -45,8 +45,8 @@ export class GeminiService {
     return data.imageUrl;
   }
 
-  static async checkUser(email: string): Promise<{ 
-    credits: number; 
+  static async checkUser(email: string, freeTrialUsed: number = 0): Promise<{
+    credits: number;
     paid_credits?: number;
     free_generations_used?: number;
     hasPaid?: boolean;
@@ -55,7 +55,7 @@ export class GeminiService {
     const response = await fetch(`${this.API_URL}/user/check`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, freeTrialUsed }),
     });
     const data = await this.handleResponse(response);
     return { ...data, email }; // Гарантируем наличие email для App.tsx

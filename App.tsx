@@ -8,14 +8,35 @@ import { GeminiService } from './services/geminiService';
 import { ICONS } from './constants';
 import { TRANSLATIONS } from './translations';
 
+const FREE_TRIAL_LIMIT = 10;
+
+const detectBrowserLanguage = (): Language => {
+  if (typeof navigator === 'undefined') return Language.EN;
+  const browserLanguages = navigator.languages?.length ? navigator.languages : [navigator.language];
+
+  for (const rawLanguage of browserLanguages) {
+    const base = rawLanguage.toLowerCase().split('-')[0];
+    if (base === 'ru') return Language.RU;
+    if (base === 'et') return Language.ET;
+    if (base === 'lv') return Language.LV;
+    if (base === 'lt') return Language.LT;
+    if (base === 'fi') return Language.FI;
+    if (base === 'en') return Language.EN;
+  }
+
+  return Language.EN;
+};
+
+const getStoredFreeGenerationsUsed = () => {
+  const saved = localStorage.getItem('ps_free_generations_used');
+  const parsed = saved ? parseInt(saved, 10) : 0;
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.min(FREE_TRIAL_LIMIT, parsed);
+};
+
 const App: React.FC = () => {
-  const [language, setLanguage] = useState<Language>(() => {
-    const saved = localStorage.getItem('ps_language');
-    return saved && Object.values(Language).includes(saved as Language) ? saved as Language : Language.EN;
-  });
-  const [step, setStep] = useState<AppStep>(() => {
-    return localStorage.getItem('ps_consent') === 'true' ? AppStep.UPLOAD : AppStep.LANGUAGE_SELECT;
-  });
+  const [language, setLanguage] = useState<Language>(() => detectBrowserLanguage());
+  const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
@@ -27,6 +48,7 @@ const App: React.FC = () => {
   const [showConsentHint, setShowConsentHint] = useState(false);
   const [hasGallery, setHasGallery] = useState(false);
   const [showEmailModalForGenerate, setShowEmailModalForGenerate] = useState(false);
+  const [freeGenerationsUsed, setFreeGenerationsUsed] = useState(getStoredFreeGenerationsUsed);
 
   const [credits, setCredits] = useState<number>(() => {
     const saved = localStorage.getItem('ps_credits');
@@ -57,6 +79,8 @@ const App: React.FC = () => {
   const recordingStreamRef = useRef<MediaStream | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const freeCreditsLeft = Math.max(0, FREE_TRIAL_LIMIT - freeGenerationsUsed);
+  const premiumFeaturesEnabled = Boolean(userEmail && hasGallery);
 
   useEffect(() => {
     const refreshCredits = async () => {
@@ -64,7 +88,7 @@ const App: React.FC = () => {
       console.log('[Sync] Refreshing credits for:', email);
       if (email) {
         try {
-          const userData = await GeminiService.checkUser(email);
+          const userData = await GeminiService.checkUser(email, getStoredFreeGenerationsUsed());
           console.log('[Sync] Server returned credits:', userData.credits);
           setCredits(userData.credits);
           setHasGallery(userData.hasPaid || false);
@@ -107,8 +131,8 @@ const App: React.FC = () => {
   }, [credits, userEmail]);
 
   useEffect(() => {
-    localStorage.setItem('ps_language', language);
-  }, [language]);
+    localStorage.setItem('ps_free_generations_used', freeGenerationsUsed.toString());
+  }, [freeGenerationsUsed]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -123,54 +147,42 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = async (style: PhotoStyle, emailOverride?: string) => {
-    console.log('--- handleGenerate started ---');
-    if (!originalImage) {
-      console.log('No original image found - aborting');
-      return;
-    }
-    
+    if (!originalImage) return;
+
     const activeEmail = emailOverride || userEmail;
-    console.log('Active email:', activeEmail);
-    
-    // Prompt for email ONLY WHEN generating!
-    if (!activeEmail) {
-      console.log('No active email, showing email modal');
-      setShowEmailModalForGenerate(true);
-      return;
-    }
-
+    const isAnonymousFreeGeneration = !activeEmail;
     let currentCredits = Number(credits);
-    console.log('Generate clicked. activeEmail:', activeEmail, 'local credits:', currentCredits);
+    let canUsePremiumDetails = premiumFeaturesEnabled;
 
-    // Refresh user explicitly before deducting locally
-    try {
-      console.log('Fetching user data...');
-      const userData = await GeminiService.checkUser(activeEmail);
-      console.log('Fetched user data:', userData);
-      currentCredits = userData.credits;
-      setCredits(userData.credits);
-      setHasGallery(userData.hasPaid || false);
-      
-      if (activeEmail !== userEmail) {
-        setUserEmail(activeEmail);
-        localStorage.setItem('ps_email', activeEmail);
+    if (isAnonymousFreeGeneration) {
+      if (freeCreditsLeft <= 0) {
+        setShowEmailModalForGenerate(true);
+        return;
       }
-    } catch (e: any) {
-      console.error('Failed to sync user before generation', e);
-      alert('Network error syncing user: ' + e.message);
-      return;
+    } else {
+      try {
+        const userData = await GeminiService.checkUser(activeEmail, freeGenerationsUsed);
+        currentCredits = userData.credits;
+        setCredits(userData.credits);
+        setHasGallery(userData.hasPaid || false);
+        canUsePremiumDetails = Boolean(userData.hasPaid);
+
+        if (activeEmail !== userEmail) {
+          setUserEmail(activeEmail);
+          localStorage.setItem('ps_email', activeEmail);
+        }
+      } catch (e: any) {
+        alert('Network error syncing user: ' + e.message);
+        return;
+      }
+
+      if (currentCredits <= 0) {
+        setShowPaymentModal(true);
+        return;
+      }
     }
 
-    console.log('Credits after sync:', currentCredits);
-    if (currentCredits <= 0) {
-      console.log('User out of credits, showing payment modal');
-      setShowPaymentModal(true);
-      return;
-    }
-
-    console.log('Starting processing state');
     const t = TRANSLATIONS[language];
-
     const statusMap = {
       [PhotoStyle.RESTORE_OLD_PHOTO]: t.processingRestore || 'Restoring and colorizing the old photo...',
       [PhotoStyle.CLASSIC_STUDIO]: t.processingClassic,
@@ -183,12 +195,16 @@ const App: React.FC = () => {
     try {
       const base64Data = originalImage.split(',')[1];
       const mimeType = originalImage.split(';')[0].split(':')[1];
-      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, customPrompt, activeEmail);
+      const promptToSend = canUsePremiumDetails ? customPrompt : '';
+      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, promptToSend, activeEmail || null);
       setResultImage(res);
       setStep(AppStep.RESULT);
 
-      setCredits(prev => Math.max(0, prev - 1));
-      
+      if (activeEmail) {
+        setCredits(prev => Math.max(0, prev - 1));
+      } else {
+        setFreeGenerationsUsed(prev => Math.min(FREE_TRIAL_LIMIT, prev + 1));
+      }
     } catch (error: any) {
       console.error("Generation error:", error);
       if (error.message === 'OUT_OF_CREDITS') {
@@ -529,47 +545,51 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <label className="text-gold text-[10px] uppercase font-bold tracking-[0.4em]">{t.customPrompt}</label>
-                <div className="space-y-4">
-                  {selectedStyle !== PhotoStyle.RESTORE_OLD_PHOTO && (
-                    <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                      {QUICK_TAGS.map(tag => (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => addTag(tag)}
-                          className="px-4 py-2 bg-white/5 hover:bg-gold/10 border border-white/10 rounded-full text-[10px] text-slate-400 hover:text-gold transition-all whitespace-nowrap uppercase tracking-widest font-bold"
-                        >
-                          + {tag}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              {premiumFeaturesEnabled && (
+                <div className="space-y-6">
+                  <label className="text-gold text-[10px] uppercase font-bold tracking-[0.4em]">{t.customPrompt}</label>
+                  <div className="space-y-4">
+                    {selectedStyle !== PhotoStyle.RESTORE_OLD_PHOTO && (
+                      <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                        {QUICK_TAGS.map(tag => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => addTag(tag)}
+                            className="px-4 py-2 bg-white/5 hover:bg-gold/10 border border-white/10 rounded-full text-[10px] text-slate-400 hover:text-gold transition-all whitespace-nowrap uppercase tracking-widest font-bold"
+                          >
+                            + {tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
-                  <div className="relative">
-                    <textarea
-                      value={customPrompt}
-                      onChange={(e) => setCustomPrompt(e.target.value)}
-                      placeholder={selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorationDetailsPlaceholder || 'Optional: approximate decade, country, uniform, or family context...') : t.customPromptPlaceholder}
-                      className="w-full bg-white/5 border border-white/10 rounded-[2rem] p-6 text-white focus:border-gold outline-none h-32 md:h-40 resize-none transition-all placeholder:text-slate-700 text-lg shadow-inner focus:bg-white/[0.07]"
-                    />
+                    <div className="relative">
+                      <textarea
+                        value={customPrompt}
+                        onChange={(e) => setCustomPrompt(e.target.value)}
+                        placeholder={selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorationDetailsPlaceholder || 'Optional: approximate decade, country, uniform, or family context...') : t.customPromptPlaceholder}
+                        className="w-full bg-white/5 border border-white/10 rounded-[2rem] p-6 text-white focus:border-gold outline-none h-32 md:h-40 resize-none transition-all placeholder:text-slate-700 text-lg shadow-inner focus:bg-white/[0.07]"
+                      />
+                    </div>
                   </div>
-
-                  {selectedStyle && (
-                    <div className="mt-4 animate-in fade-in slide-in-from-top-6 duration-500">
-                      <button
-                        type="button"
-                        onClick={() => handleGenerate(selectedStyle)}
-                        className="w-full py-7 bg-gold text-black rounded-[2rem] font-black text-2xl flex items-center justify-center gap-5 transition-all hover:bg-white hover:scale-[1.02] shadow-[0_20px_50px_rgba(194,163,93,0.35)] active:scale-95"
-                      >
-                        <ICONS.Magic /> {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorePhotoBtn || 'Restore Old Photo') : t.generateBtn}
-                      </button>
-                      <p className="text-center mt-4 text-[9px] text-slate-600 uppercase tracking-[0.4em] font-bold">Neural Engine Processing ~30s</p>
-                    </div>
-                  )}
                 </div>
-              </div>
+              )}
+
+              {selectedStyle && (
+                <div className="mt-4 animate-in fade-in slide-in-from-top-6 duration-500">
+                  <button
+                    type="button"
+                    onClick={() => handleGenerate(selectedStyle)}
+                    className="w-full py-7 bg-gold text-black rounded-[2rem] font-black text-2xl flex items-center justify-center gap-5 transition-all hover:bg-white hover:scale-[1.02] shadow-[0_20px_50px_rgba(194,163,93,0.35)] active:scale-95"
+                  >
+                    <ICONS.Magic /> {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorePhotoBtn || 'Restore Old Photo') : t.generateBtn}
+                  </button>
+                  <p className="text-center mt-4 text-[10px] text-slate-500 uppercase tracking-[0.35em] font-bold">
+                    {userEmail ? `${t.creditsLeft}: ${credits}` : `${t.freeCredits}: ${freeCreditsLeft}`}
+                  </p>
+                </div>
+              )}
 
               <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-600 hover:text-white text-[10px] uppercase tracking-[0.5em] font-bold py-4 transition-all hover:translate-x-[-4px]">← {t.backToUpload || "Back to Upload"}</button>
             </div>
@@ -762,7 +782,7 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col pb-24 bg-dark font-sans selection:bg-gold selection:text-black scroll-smooth">
       <Header
         language={language}
-        credits={credits}
+        credits={userEmail ? credits : freeCreditsLeft}
         userEmail={userEmail}
         hasGallery={hasGallery}
         onViewHistory={() => setStep(AppStep.HISTORY)}
@@ -812,10 +832,15 @@ const App: React.FC = () => {
         <PaymentModal
           language={language}
           onSelect={async (planId) => {
-            if (!userEmail) return;
+            const checkoutEmail = userEmail || localStorage.getItem('ps_email');
+            if (!checkoutEmail) {
+              setShowPaymentModal(false);
+              setShowEmailModalForGenerate(true);
+              return;
+            }
             const creditsToAdd = planId === 'plan_small' ? 20 : 50;
             try {
-              const session = await GeminiService.createCheckoutSession(userEmail, planId, creditsToAdd);
+              const session = await GeminiService.createCheckoutSession(checkoutEmail, planId, creditsToAdd);
               if (session.url) window.location.href = session.url;
             } catch (e: any) {
               alert("Payment Error: " + e.message);

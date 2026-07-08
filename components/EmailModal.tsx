@@ -12,12 +12,17 @@ interface EmailModalProps {
 const EmailModal: React.FC<EmailModalProps> = ({ onSubmit, onClose, language, cancellable = true }) => {
     const [email, setEmail] = useState('');
     const [error, setError] = useState('');
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
     const t = TRANSLATIONS[language] || TRANSLATIONS[Language.EN];
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!email.includes('@') || !email.includes('.')) {
-            setError(language === Language.RU ? 'Введите корректный email' : 'Please enter a valid email');
+            setError(language === Language.RU ? '??????? ?????????? email' : 'Please enter a valid email');
+            return;
+        }
+        if (!acceptedTerms) {
+            setError(t.consentHint || (language === Language.RU ? '????????? ???????, ????? ??????????.' : 'Tick this box to continue.'));
             return;
         }
         onSubmit(email);
@@ -59,6 +64,17 @@ const EmailModal: React.FC<EmailModalProps> = ({ onSubmit, onClose, language, ca
                         className="w-full bg-white/5 border border-white/10 focus:border-gold rounded-2xl px-6 py-4 text-white outline-none transition-all placeholder:text-slate-600 text-center text-lg"
                         autoFocus
                     />
+                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={(e) => { setAcceptedTerms(e.target.checked); setError(''); }}
+                            className="mt-1 h-5 w-5 shrink-0 rounded border-white/30 bg-black/70 accent-[#c2a35d]"
+                        />
+                        <span className="text-xs leading-5 text-slate-400">
+                            {t.consentText} <a href="/terms.html" target="_blank" className="text-gold hover:underline">Terms of Use</a> / <a href="/privacy-policy.html" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink}</a>.
+                        </span>
+                    </label>
                     {error && <p className="text-red-400 text-xs text-center">{error}</p>}
                     <button
                         type="submit"

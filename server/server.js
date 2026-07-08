@@ -22,6 +22,8 @@ const allowedOrigins = new Set([
   'http://localhost:3000'
 ].filter(Boolean));
 
+const FREE_TRIAL_LIMIT = 10;
+
 const PLANS = {
   plan_small: { priceId: process.env.PRICE_20_ID, credits: 20 },
   plan_large: { priceId: process.env.PRICE_50_ID, credits: 50 }
@@ -478,9 +480,14 @@ app.use((err, req, res, next) => {
 app.get('/api/health', (req, res) => res.send('OK'));
 
 app.post('/api/user/check', async (req, res) => {
-  const { email } = req.body;
+  const { email, freeTrialUsed } = req.body;
   const normalEmail = normalizeEmail(email);
   if (!isValidEmail(normalEmail)) return res.status(400).json({ error: 'Valid email required' });
+
+  const declaredFreeUsed = Math.min(
+    FREE_TRIAL_LIMIT,
+    Math.max(0, Number.isFinite(Number(freeTrialUsed)) ? Math.floor(Number(freeTrialUsed)) : 0)
+  );
 
   let { data: user, error: findError } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
   if (findError) console.error('[DB] checkUser find error:', findError);
@@ -488,7 +495,7 @@ app.post('/api/user/check', async (req, res) => {
   if (!user) {
     const { data: newUser, error: insertError } = await supabase
       .from('users')
-      .insert({ email: normalEmail, free_generations_used: 0, paid_credits: 0 })
+      .insert({ email: normalEmail, free_generations_used: declaredFreeUsed, paid_credits: 0 })
       .select('*')
       .maybeSingle();
     if (insertError) {
@@ -497,11 +504,23 @@ app.post('/api/user/check', async (req, res) => {
     }
     user = newUser;
     appendStatsEvent('user_created', { email: normalEmail, maskedEmail: maskEmail(normalEmail) });
+  } else if (declaredFreeUsed > (user.free_generations_used || 0) && (user.paid_credits || 0) <= 0) {
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('users')
+      .update({ free_generations_used: declaredFreeUsed })
+      .eq('email', normalEmail)
+      .select('*')
+      .maybeSingle();
+    if (updateError) {
+      console.error('[DB] checkUser update free usage error:', updateError);
+    } else if (updatedUser) {
+      user = updatedUser;
+    }
   }
 
   const freeUsed = user?.free_generations_used || 0;
   const paidCredits = user?.paid_credits || 0;
-  const credits = Math.max(0, 5 - freeUsed) + paidCredits;
+  const credits = Math.max(0, FREE_TRIAL_LIMIT - freeUsed) + paidCredits;
   
   const { count } = await supabase.from('generations').select('*', { count: 'exact', head: true }).eq('user_email', normalEmail);
   const hasPaid = paidCredits > 0 || (count > 0);
@@ -513,16 +532,21 @@ app.post('/api/generate', async (req, res) => {
   const { image, mimeType, style, aspectRatio, prompt, email } = req.body;
 
   const normalEmail = normalizeEmail(email);
-  if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
+  const hasEmail = Boolean(normalEmail);
+  if (email && !isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
 
   try {
     const imagePayload = parseImagePayload(image, mimeType);
+    let user = null;
 
-    const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
-    if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+    if (hasEmail) {
+      const { data } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
+      user = data;
+      if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
-    const credits = Math.max(0, 5 - (user.free_generations_used || 0)) + (user.paid_credits || 0);
-    if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+      const credits = Math.max(0, FREE_TRIAL_LIMIT - (user.free_generations_used || 0)) + (user.paid_credits || 0);
+      if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+    }
 
     const isRestorationStyle = style === 'RESTORE_OLD_PHOTO';
     const generationPrompt = isRestorationStyle
@@ -538,25 +562,30 @@ Style: ${style}. ${prompt || ''}`;
 
     if (genImg) {
       let usedPaidCredit = false;
-      if ((user.paid_credits || 0) > 0) {
-        await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail);
-        usedPaidCredit = true;
-      } else {
-        await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail);
+
+      if (hasEmail && user) {
+        if ((user.paid_credits || 0) > 0) {
+          await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail);
+          usedPaidCredit = true;
+        } else {
+          await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail);
+        }
+
+        if (usedPaidCredit) {
+          await supabase.from('generations').insert({
+            user_email: normalEmail, style_name: style, aspect_ratio: aspectRatio,
+            generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
+          });
+        }
       }
 
-      if (usedPaidCredit) {
-        await supabase.from('generations').insert({
-          user_email: normalEmail, style_name: style, aspect_ratio: aspectRatio,
-          generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
-        });
-      }
       appendStatsEvent('generation_success', {
-        email: normalEmail,
-        maskedEmail: maskEmail(normalEmail),
+        email: hasEmail ? normalEmail : null,
+        maskedEmail: hasEmail ? maskEmail(normalEmail) : null,
         action: 'generate',
         style,
-        creditType: usedPaidCredit ? 'paid' : 'free'
+        creditType: usedPaidCredit ? 'paid' : 'free',
+        mode: hasEmail ? 'email' : 'anonymous'
       });
       res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
     } else {
@@ -578,7 +607,7 @@ app.post('/api/refine', async (req, res) => {
     const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
     if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
-    const credits = Math.max(0, 5 - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
+    const credits = Math.max(0, FREE_TRIAL_LIMIT - (user?.free_generations_used || 0)) + (user?.paid_credits || 0);
     if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
 
     const genImg = await generateImage([
