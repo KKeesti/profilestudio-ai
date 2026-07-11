@@ -218,7 +218,7 @@ const App: React.FC = () => {
   };
 
   const handleRefine = async () => {
-    if (!resultImage || !correctionRequest || !userEmail) return;
+    if (!resultImage || !correctionRequest || !userEmail || !premiumFeaturesEnabled) return;
 
     setProcessing({ isProcessing: true, status: language === Language.RU ? 'Применяем правки...' : 'Refining...' });
 
@@ -282,7 +282,7 @@ const App: React.FC = () => {
   };
 
   const startRecording = async () => {
-    if (isRecording || processing.isProcessing) return;
+    if (isRecording || processing.isProcessing || !premiumFeaturesEnabled) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
@@ -532,7 +532,13 @@ const App: React.FC = () => {
                     <button
                       key={style.id}
                       type="button"
-                      onClick={() => setSelectedStyle(style.id)}
+                      onClick={() => {
+                        setSelectedStyle(style.id);
+                        if (!premiumFeaturesEnabled) {
+                          void handleGenerate(style.id);
+                        }
+                      }}
+                      disabled={processing.isProcessing}
                       className={`p-5 rounded-[1.8rem] border-2 flex items-center gap-5 text-left transition-all group ${selectedStyle === style.id ? 'border-gold bg-gold/5 ring-1 ring-gold/20' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
                     >
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${selectedStyle === style.id ? 'bg-gold text-black' : 'bg-white/5 text-slate-500'}`}>{style.icon}</div>
@@ -576,7 +582,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {selectedStyle && (
+              {selectedStyle && premiumFeaturesEnabled && (
                 <div className="mt-4 animate-in fade-in slide-in-from-top-6 duration-500">
                   <button
                     type="button"
@@ -640,7 +646,7 @@ const App: React.FC = () => {
             </div>
 
             <div className="w-full max-w-3xl space-y-8">
-              {hasGallery && (
+              {premiumFeaturesEnabled && (
                 <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-10 rounded-[2.5rem] border border-white/10 space-y-8 shadow-2xl">
                   <div className="flex items-center justify-between">
                     <label className="text-gold text-[10px] font-bold uppercase tracking-[0.4em]">{t.refineTitle}</label>
