@@ -50,14 +50,8 @@ const App: React.FC = () => {
   const [showEmailModalForGenerate, setShowEmailModalForGenerate] = useState(false);
   const [freeGenerationsUsed, setFreeGenerationsUsed] = useState(getStoredFreeGenerationsUsed);
 
-  const [credits, setCredits] = useState<number>(() => {
-    const saved = localStorage.getItem('ps_credits');
-    const val = saved ? parseInt(saved, 10) : null;
-    // Only use saved value if email is also saved — otherwise 0
-    const hasEmail = !!localStorage.getItem('ps_email');
-    return (hasEmail && val !== null && !isNaN(val)) ? val : 0;
-  });
-  const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('ps_email'));
+  const [credits, setCredits] = useState<number>(0);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [historyItems, setHistoryItems] = useState<Array<{
     id: string;
@@ -83,42 +77,69 @@ const App: React.FC = () => {
   const premiumFeaturesEnabled = Boolean(userEmail && hasGallery);
 
   useEffect(() => {
-    const refreshCredits = async () => {
-      const email = localStorage.getItem('ps_email');
-      console.log('[Sync] Refreshing credits for:', email);
-      if (email) {
-        try {
-          const userData = await GeminiService.checkUser(email, getStoredFreeGenerationsUsed());
-          console.log('[Sync] Server returned credits:', userData.credits);
-          setCredits(userData.credits);
-          setHasGallery(userData.hasPaid || false);
-        } catch (e) {
-          console.error("[Sync] Failed to refresh credits:", e);
+    let cancelled = false;
+
+    const initializeSession = async () => {
+      try {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const accessToken = hashParams.get('access_token');
+        if (accessToken) {
+          await GeminiService.establishLoginSession(accessToken);
+          window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`);
         }
+
+        const currentUser = await GeminiService.getCurrentUser();
+        const params = new URLSearchParams(window.location.search);
+
+        if (!currentUser) {
+          localStorage.removeItem('ps_email');
+          localStorage.removeItem('ps_credits');
+          if (params.get('payment') === 'cancel') setPaymentStatus('cancel');
+          if (params.has('payment')) window.history.replaceState({}, '', window.location.pathname);
+          return;
+        }
+
+        const userData = await GeminiService.checkUser(getStoredFreeGenerationsUsed());
+        if (cancelled) return;
+        setUserEmail(currentUser.email);
+        localStorage.setItem('ps_email', currentUser.email);
+        setCredits(userData.credits);
+        setHasGallery(userData.hasPaid || false);
+
+        if (params.get('payment') === 'success') {
+          setPaymentStatus('success');
+          window.history.replaceState({}, '', window.location.pathname);
+          window.setTimeout(async () => {
+            try {
+              const refreshed = await GeminiService.checkUser(getStoredFreeGenerationsUsed());
+              if (!cancelled) {
+                setCredits(refreshed.credits);
+                setHasGallery(refreshed.hasPaid || false);
+              }
+            } catch (error) {
+              console.error('Failed to refresh paid credits', error);
+            }
+          }, 2000);
+        } else if (params.get('payment') === 'cancel') {
+          setPaymentStatus('cancel');
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch (error) {
+        console.error('Failed to initialize secure session', error);
+        localStorage.removeItem('ps_email');
+        localStorage.removeItem('ps_credits');
       }
     };
 
-    refreshCredits();
-
-    // Check URL for payment status
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('payment') === 'success') {
-      setPaymentStatus('success');
-      // Очищаем URL от параметров
-      window.history.replaceState({}, '', window.location.pathname);
-      // Обновляем баланс (может занять пару секунд из-за webhook)
-      setTimeout(refreshCredits, 2000);
-    } else if (params.get('payment') === 'cancel') {
-      setPaymentStatus('cancel');
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+    void initializeSession();
+    return () => { cancelled = true; };
   }, []);
 
   // Загружаем историю при переходе на соответствующий экран
   useEffect(() => {
     if (step !== AppStep.HISTORY || !userEmail) return;
     setLoadingHistory(true);
-    GeminiService.getHistory(userEmail)
+    GeminiService.getHistory()
       .then(items => setHistoryItems(items))
       .catch(err => console.error('Failed to load history:', err))
       .finally(() => setLoadingHistory(false));
@@ -146,10 +167,10 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerate = async (style: PhotoStyle, emailOverride?: string) => {
+  const handleGenerate = async (style: PhotoStyle) => {
     if (!originalImage) return;
 
-    const activeEmail = emailOverride || userEmail;
+    const activeEmail = userEmail;
     const isAnonymousFreeGeneration = !activeEmail;
     let currentCredits = Number(credits);
     let canUsePremiumDetails = premiumFeaturesEnabled;
@@ -161,16 +182,12 @@ const App: React.FC = () => {
       }
     } else {
       try {
-        const userData = await GeminiService.checkUser(activeEmail, freeGenerationsUsed);
+        const userData = await GeminiService.checkUser(freeGenerationsUsed);
         currentCredits = userData.credits;
         setCredits(userData.credits);
         setHasGallery(userData.hasPaid || false);
         canUsePremiumDetails = Boolean(userData.hasPaid);
 
-        if (activeEmail !== userEmail) {
-          setUserEmail(activeEmail);
-          localStorage.setItem('ps_email', activeEmail);
-        }
       } catch (e: any) {
         alert('Network error syncing user: ' + e.message);
         return;
@@ -196,7 +213,7 @@ const App: React.FC = () => {
       const base64Data = originalImage.split(',')[1];
       const mimeType = originalImage.split(';')[0].split(':')[1];
       const promptToSend = canUsePremiumDetails ? customPrompt : '';
-      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, promptToSend, activeEmail || null);
+      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, promptToSend);
       setResultImage(res);
       setStep(AppStep.RESULT);
 
@@ -223,7 +240,7 @@ const App: React.FC = () => {
     setProcessing({ isProcessing: true, status: language === Language.RU ? 'Применяем правки...' : 'Refining...' });
 
     try {
-      const res = await GeminiService.refinePhoto(resultImage, correctionRequest, userEmail);
+      const res = await GeminiService.refinePhoto(resultImage, correctionRequest);
       setResultImage(res);
       setCorrectionRequest('');
       setCredits(prev => Math.max(0, prev - 1));
@@ -313,12 +330,12 @@ const App: React.FC = () => {
           if (userEmail) {
             setProcessing({ isProcessing: true, status: language === Language.RU ? 'Распознаем голос...' : 'Transcribing voice...' });
             try {
-              const text = await GeminiService.transcribe(base64Audio, mimeType, userEmail);
+              const text = await GeminiService.transcribe(base64Audio, mimeType);
               if (text) {
                 setCorrectionRequest(text);
                 // Автоматически запускаем правку после распознавания
                 setProcessing({ isProcessing: true, status: language === Language.RU ? 'Применяем правки...' : 'Refining...' });
-                const res = await GeminiService.refinePhoto(resultImage!, text, userEmail);
+                const res = await GeminiService.refinePhoto(resultImage!, text);
                 setResultImage(res);
                 setCredits(prev => Math.max(0, prev - 1));
               }
@@ -793,6 +810,20 @@ const App: React.FC = () => {
         hasGallery={hasGallery}
         onViewHistory={() => setStep(AppStep.HISTORY)}
         onBuyCredits={() => setShowPaymentModal(true)}
+        onLogout={async () => {
+          try {
+            await GeminiService.logout();
+          } finally {
+            setUserEmail(null);
+            setCredits(0);
+            setHasGallery(false);
+            setHistoryItems([]);
+            setResultImage(null);
+            setStep(AppStep.UPLOAD);
+            localStorage.removeItem('ps_email');
+            localStorage.removeItem('ps_credits');
+          }
+        }}
       />
       <main className="container mx-auto px-6 pt-8 relative z-10 flex-grow">
         {renderContent()}
@@ -838,15 +869,13 @@ const App: React.FC = () => {
         <PaymentModal
           language={language}
           onSelect={async (planId) => {
-            const checkoutEmail = userEmail || localStorage.getItem('ps_email');
-            if (!checkoutEmail) {
+            if (!userEmail) {
               setShowPaymentModal(false);
               setShowEmailModalForGenerate(true);
               return;
             }
-            const creditsToAdd = planId === 'plan_small' ? 20 : 50;
             try {
-              const session = await GeminiService.createCheckoutSession(checkoutEmail, planId, creditsToAdd);
+              const session = await GeminiService.createCheckoutSession(planId);
               if (session.url) window.location.href = session.url;
             } catch (e: any) {
               alert("Payment Error: " + e.message);
@@ -861,13 +890,24 @@ const App: React.FC = () => {
           language={language}
           cancellable={true}
           onClose={() => setShowEmailModalForGenerate(false)}
+          initialEmail={localStorage.getItem('ps_email') || ''}
           onSubmit={async (email) => {
-            // First we save locally to immediately display it
-            setUserEmail(email);
-            localStorage.setItem('ps_email', email);
-            setShowEmailModalForGenerate(false);
-            if (selectedStyle) {
-              await handleGenerate(selectedStyle, email);
+            try {
+              await GeminiService.createDeviceSession(email, freeGenerationsUsed);
+              const userData = await GeminiService.checkUser(freeGenerationsUsed);
+              setUserEmail(userData.email);
+              localStorage.setItem('ps_email', userData.email);
+              setCredits(userData.credits);
+              setHasGallery(userData.hasPaid || false);
+              setShowEmailModalForGenerate(false);
+              if (userData.credits <= 0) setShowPaymentModal(true);
+            } catch (error) {
+              if (error instanceof Error && error.message === 'EMAIL_VERIFICATION_REQUIRED') {
+                await GeminiService.requestLoginLink(email);
+                localStorage.setItem('ps_email', email);
+                return 'LOGIN_LINK_SENT';
+              }
+              throw error;
             }
           }}
         />

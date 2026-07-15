@@ -12,13 +12,15 @@ dist
 dist-ssr
 *.local
 
-# Секретные ключи - НИКОГДА не загружать на GitHub!
+# Secrets and private runtime data
 .env
 .env.local
 .env.*.local
 server/.env
 server/.processed-stripe-events.json
 server/.shotme-stats-events.jsonl
+server/.shotme-sessions.json
+server/.shotme-anonymous-usage.json
 
 # Editor directories and files
 .vscode/*

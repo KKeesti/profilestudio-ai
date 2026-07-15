@@ -1,0 +1,38 @@
+[Unit]
+Description=ShotMe.ee application server
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shotme
+Group=shotme
+WorkingDirectory=/var/www/shotme
+Environment=NODE_ENV=production
+Environment=HOST=172.17.0.1
+Environment=RUNTIME_DIR=/var/lib/shotme
+ExecStart=/usr/bin/node /var/www/shotme/server/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/shotme
+ProtectClock=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

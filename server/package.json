@@ -1,10 +1,10 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "ShotMe.ee backend",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test --test-isolation=none security.test.js"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +16,6 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "multer": "^2.1.1",
     "stripe": "^20.4.1",
     "ws": "^8.21.0"
   }

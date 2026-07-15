@@ -1,82 +1,97 @@
+const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
-require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
+
+require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
+
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 const { createClient } = require('@supabase/supabase-js');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
 const WebSocket = require('ws');
+const {
+  createAnonymousUsageStore,
+  createSessionStore,
+  hashToken,
+  parseCookies,
+  safeEqual,
+  serializeCookie,
+} = require('./security');
 
-process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+const isProduction = (process.env.NODE_ENV || 'production') === 'production';
+const requiredProductionSettings = [
+  'GEMINI_API_KEY',
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'PRICE_20_ID',
+  'PRICE_50_ID',
+  'ADMIN_STATS_TOKEN',
+];
+
+if (isProduction) {
+  const missing = requiredProductionSettings.filter(name => !process.env[name]);
+  if (missing.length) throw new Error(`Missing required production settings: ${missing.join(', ')}`);
+}
 
 const app = express();
-const port = process.env.PORT || 3001;
-const frontendUrl = process.env.FRONTEND_URL || 'https://shotme.ee';
-const isProduction = process.env.NODE_ENV === 'production';
+const port = Number(process.env.PORT || 3001);
+const host = process.env.HOST || (isProduction ? '127.0.0.1' : '0.0.0.0');
+const frontendUrl = (process.env.FRONTEND_URL || 'https://shotme.ee').replace(/\/$/, '');
 const maxJsonSize = process.env.JSON_BODY_LIMIT || '24mb';
+
+if (isProduction && !frontendUrl.startsWith('https://')) {
+  throw new Error('FRONTEND_URL must use HTTPS in production');
+}
+
 const allowedOrigins = new Set([
   frontendUrl,
   'https://shotme.ee',
   'https://www.shotme.ee',
-  'http://localhost:3000'
+  ...(!isProduction ? ['http://localhost:3000'] : []),
 ].filter(Boolean));
 
 const FREE_TRIAL_LIMIT = 10;
-const ANONYMOUS_DAILY_GENERATION_LIMIT = Number(process.env.ANONYMOUS_DAILY_GENERATION_LIMIT || 12);
-const MAX_ACTIVE_GENERATIONS_PER_KEY = Number(process.env.MAX_ACTIVE_GENERATIONS_PER_KEY || 2);
+const ANONYMOUS_DAILY_GENERATION_LIMIT = Number(process.env.ANONYMOUS_DAILY_GENERATION_LIMIT || 10);
+const MAX_ACTIVE_GENERATIONS_PER_KEY = Number(process.env.MAX_ACTIVE_GENERATIONS_PER_KEY || 1);
 const MAX_PROMPT_LENGTH = Number(process.env.MAX_PROMPT_LENGTH || 800);
 const MAX_REFINE_PROMPT_LENGTH = Number(process.env.MAX_REFINE_PROMPT_LENGTH || 500);
+const SESSION_COOKIE = 'shotme_session';
+const ANONYMOUS_COOKIE = 'shotme_anon';
+const SESSION_MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
+const ANONYMOUS_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+
 const ALLOWED_STYLES = new Set(['RESTORE_OLD_PHOTO', 'CLASSIC_STUDIO', 'FASHION_EDITORIAL', 'BUSINESS_LUXE']);
 const ALLOWED_ASPECT_RATIOS = new Set(['9:16', '16:9']);
-
 const PLANS = {
-  plan_small: { priceId: process.env.PRICE_20_ID, credits: 20 },
-  plan_large: { priceId: process.env.PRICE_50_ID, credits: 50 }
+  plan_small: { priceId: process.env.PRICE_20_ID, credits: 20, amountCents: 500 },
+  plan_large: { priceId: process.env.PRICE_50_ID, credits: 50, amountCents: 1000 },
 };
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image';
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
-const STRIPE_EVENTS_FILE = path.join(__dirname, '.processed-stripe-events.json');
-const STATS_EVENTS_FILE = path.join(__dirname, '.shotme-stats-events.jsonl');
+const runtimeDirectory = process.env.RUNTIME_DIR || __dirname;
+fs.mkdirSync(runtimeDirectory, { recursive: true, mode: 0o700 });
+const STRIPE_EVENTS_FILE = path.join(runtimeDirectory, '.processed-stripe-events.json');
+const STATS_EVENTS_FILE = path.join(runtimeDirectory, '.shotme-stats-events.jsonl');
+const SESSION_FILE = path.join(runtimeDirectory, '.shotme-sessions.json');
+const ANONYMOUS_USAGE_FILE = path.join(runtimeDirectory, '.shotme-anonymous-usage.json');
 const STATS_TIME_ZONE = process.env.STATS_TIME_ZONE || 'Europe/Tallinn';
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
+const supabaseOptions = {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  realtime: { transport: WebSocket },
+};
 const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-  { realtime: { transport: WebSocket } }
+  process.env.SUPABASE_URL || 'http://127.0.0.1',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 'local-placeholder',
+  supabaseOptions,
 );
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-app.disable('x-powered-by');
-app.set('trust proxy', 1);
-
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('X-Frame-Options', 'DENY');
-  if (isProduction) {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  }
-  res.setHeader('X-DNS-Prefetch-Control', 'off');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), payment=(), usb=()');
-  res.setHeader('Content-Security-Policy', [
-    "default-src 'self'",
-    "script-src 'self' https://cdn.tailwindcss.com 'unsafe-inline'",
-    "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
-    "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https:",
-    "connect-src 'self' https://api.stripe.com",
-    "frame-src https://checkout.stripe.com",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "frame-ancestors 'none'"
-  ].join('; '));
-  next();
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'local-placeholder' });
+const sessionStore = createSessionStore(SESSION_FILE);
+const anonymousUsageStore = createAnonymousUsageStore(ANONYMOUS_USAGE_FILE, { limit: FREE_TRIAL_LIMIT });
 
 const MASTER_PROMPT = `IDENTITY PRESERVATION IS THE TOP PRIORITY.
 Preserve every visible person's face as close to the source photo as possible: facial geometry, eye shape, nose, mouth, jawline, cheeks, age, expression, gaze direction, skin texture, distinctive marks, and asymmetry.
@@ -95,29 +110,263 @@ Do NOT modernize clothing, add makeup, beautify faces, de-age people, reshape bo
 Only reconstruct missing or damaged areas from the local visual context of the original photo.
 Return exactly one restored color image. Do not answer with text only.`;
 
-const generationBuckets = new Map();
-const activeGenerationCounts = new Map();
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function normalizeEmail(email) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+}
+
+function isValidEmail(email) {
+  return typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function maskEmail(email) {
+  const [name = '', domain = ''] = String(email || '').split('@');
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function statsIdentity(email) {
+  if (!email) return null;
+  const key = process.env.STATS_HASH_SECRET || process.env.STRIPE_WEBHOOK_SECRET || 'local-stats-key';
+  return crypto.createHmac('sha256', key).update(normalizeEmail(email)).digest('hex');
+}
 
 function getClientKey(req) {
-  return String(req.ip || req.headers['x-forwarded-for'] || 'unknown').split(',')[0].trim() || 'unknown';
+  return String(req.ip || 'unknown').split(',')[0].trim() || 'unknown';
 }
+
+function appendSetCookie(res, cookie) {
+  const existing = res.getHeader('Set-Cookie');
+  if (!existing) return res.setHeader('Set-Cookie', cookie);
+  res.setHeader('Set-Cookie', Array.isArray(existing) ? [...existing, cookie] : [existing, cookie]);
+}
+
+function setSessionCookie(res, token) {
+  appendSetCookie(res, serializeCookie(SESSION_COOKIE, token, {
+    maxAge: SESSION_MAX_AGE_SECONDS,
+    secure: isProduction,
+    sameSite: 'Lax',
+  }));
+}
+
+function clearSessionCookie(res) {
+  appendSetCookie(res, serializeCookie(SESSION_COOKIE, '', {
+    maxAge: 0,
+    secure: isProduction,
+    sameSite: 'Lax',
+  }));
+}
+
+function getSessionToken(req) {
+  return parseCookies(req.headers.cookie)[SESSION_COOKIE] || '';
+}
+
+function getSessionEmail(req) {
+  return sessionStore.resolve(getSessionToken(req));
+}
+
+function optionalAuth(req, _res, next) {
+  req.authEmail = getSessionEmail(req);
+  next();
+}
+
+function requireAuth(req, res, next) {
+  const email = getSessionEmail(req);
+  if (!email) return res.status(401).json({ error: 'AUTH_REQUIRED' });
+  req.authEmail = email;
+  next();
+}
+
+function normalizeUserPrompt(prompt, maxLength = MAX_PROMPT_LENGTH) {
+  if (prompt === undefined || prompt === null) return '';
+  if (typeof prompt !== 'string') throw new HttpError(400, 'Prompt must be text');
+  const normalized = prompt.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (normalized.length > maxLength) throw new HttpError(400, 'Prompt is too long');
+  return normalized;
+}
+
+function getImageMimeFromMagic(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return '';
+}
+
+function parseBase64Payload(payload, maxLength, errorLabel) {
+  if (!payload || typeof payload !== 'string') throw new HttpError(400, `${errorLabel} is required`);
+  const normalized = payload.replace(/\s/g, '');
+  if (!normalized || normalized.length > maxLength || !/^[a-z0-9+/]+={0,2}$/i.test(normalized)) {
+    throw new HttpError(normalized.length > maxLength ? 413 : 400, `Invalid ${errorLabel.toLowerCase()} data`);
+  }
+  const buffer = Buffer.from(normalized, 'base64');
+  if (!buffer.length) throw new HttpError(400, `Invalid ${errorLabel.toLowerCase()} data`);
+  return { normalized, buffer };
+}
+
+function parseImagePayload(image, declaredMimeType) {
+  if (!image || typeof image !== 'string') throw new HttpError(400, 'Image is required');
+  let base64Data = image;
+  let dataUrlMime = '';
+  const dataUrlMatch = image.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
+  if (dataUrlMatch) {
+    dataUrlMime = dataUrlMatch[1].toLowerCase();
+    base64Data = dataUrlMatch[2];
+  }
+  const parsed = parseBase64Payload(base64Data, 18 * 1024 * 1024, 'Image');
+  const detectedMimeType = getImageMimeFromMagic(parsed.buffer);
+  if (!detectedMimeType) throw new HttpError(400, 'Unsupported image type');
+  const mimeType = String(dataUrlMime || declaredMimeType || detectedMimeType).toLowerCase().replace('image/jpg', 'image/jpeg');
+  if (mimeType !== detectedMimeType) throw new HttpError(400, 'Image type does not match the file data');
+  return { base64Data: parsed.normalized, mimeType: detectedMimeType };
+}
+
+function parseAudioPayload(audio, mimeType) {
+  const parsed = parseBase64Payload(audio, 8 * 1024 * 1024, 'Audio');
+  const normalizedMime = String(mimeType || 'audio/webm').toLowerCase().split(';')[0];
+  if (!new Set(['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/ogg']).has(normalizedMime)) {
+    throw new HttpError(400, 'Unsupported audio type');
+  }
+
+  const buffer = parsed.buffer;
+  const matchesMagic =
+    (normalizedMime === 'audio/webm' && buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) ||
+    (normalizedMime === 'audio/wav' && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WAVE') ||
+    (normalizedMime === 'audio/ogg' && buffer.toString('ascii', 0, 4) === 'OggS') ||
+    (normalizedMime === 'audio/mp4' && buffer.toString('ascii', 4, 8) === 'ftyp') ||
+    (normalizedMime === 'audio/mpeg' && (buffer.toString('ascii', 0, 3) === 'ID3' || (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0)));
+  if (!matchesMagic) throw new HttpError(400, 'Audio type does not match the file data');
+  return { base64Data: parsed.normalized, mimeType: normalizedMime };
+}
+
+function sendRouteError(res, label, err) {
+  const status = Number(err.status) || 500;
+  if (status >= 500) console.error(`[${label}] ${err.name || 'Error'}: ${err.message}`);
+  res.status(status).json({ error: status >= 500 && isProduction ? 'Internal server error' : err.message });
+}
+
+function writeJsonAtomic(filePath, value) {
+  const tempPath = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(value), { mode: 0o600 });
+  fs.renameSync(tempPath, filePath);
+  fs.chmodSync(filePath, 0o600);
+}
+
+function appendStatsEvent(type, payload = {}) {
+  const event = { ts: new Date().toISOString(), type, ...payload };
+  fs.appendFile(STATS_EVENTS_FILE, `${JSON.stringify(event)}\n`, { mode: 0o600 }, err => {
+    if (err) console.error('[Stats] Failed to write event:', err.message);
+    else fs.chmod(STATS_EVENTS_FILE, 0o600, () => {});
+  });
+}
+
+function readStatsEvents(start, end) {
+  try {
+    return fs.readFileSync(STATS_EVENTS_FILE, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        try { return JSON.parse(line); } catch { return null; }
+      })
+      .filter(event => event && event.ts && event.ts >= start.toISOString() && event.ts < end.toISOString());
+  } catch {
+    return [];
+  }
+}
+
+function timeZoneOffsetMs(timeZone, date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return Date.UTC(
+    Number(values.year), Number(values.month) - 1, Number(values.day),
+    Number(values.hour), Number(values.minute), Number(values.second),
+  ) - date.getTime();
+}
+
+function zonedDayToUtc(year, month, day, timeZone) {
+  const guess = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  return new Date(guess.getTime() - timeZoneOffsetMs(timeZone, guess));
+}
+
+function getStatsRange(dateParam) {
+  const now = new Date();
+  let year;
+  let month;
+  let day;
+  if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    [year, month, day] = dateParam.split('-').map(Number);
+  } else {
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: STATS_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(yesterday);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    year = Number(values.year);
+    month = Number(values.month);
+    day = Number(values.day);
+  }
+  const start = zonedDayToUtc(year, month, day, STATS_TIME_ZONE);
+  const nextDay = new Date(Date.UTC(year, month - 1, day + 1));
+  const end = zonedDayToUtc(nextDay.getUTCFullYear(), nextDay.getUTCMonth() + 1, nextDay.getUTCDate(), STATS_TIME_ZONE);
+  const label = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return { start, end, label };
+}
+
+function isAdminRequest(req) {
+  const configuredToken = process.env.ADMIN_STATS_TOKEN;
+  if (!configuredToken) return false;
+  const auth = req.headers.authorization || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const headerToken = req.headers['x-admin-token'] || '';
+  return safeEqual(bearer || headerToken, configuredToken);
+}
+
+const apiBuckets = new Map();
+const generationBuckets = new Map();
+const activeGenerationCounts = new Map();
+const authBuckets = new Map();
 
 function takeWindowBudget(map, key, maxCount, windowMs) {
   const now = Date.now();
   const bucket = map.get(key) || { count: 0, resetAt: now + windowMs };
-
   if (now > bucket.resetAt) {
     bucket.count = 0;
     bucket.resetAt = now + windowMs;
   }
-
-  if (bucket.count >= maxCount) {
-    return { allowed: false, resetAt: bucket.resetAt };
-  }
-
+  if (bucket.count >= maxCount) return { allowed: false, resetAt: bucket.resetAt };
   bucket.count += 1;
   map.set(key, bucket);
+  if (map.size > 10000) {
+    for (const [entryKey, entry] of map) if (now > entry.resetAt) map.delete(entryKey);
+  }
   return { allowed: true, resetAt: bucket.resetAt };
+}
+
+function apiRateLimit(req, res, next) {
+  const budget = takeWindowBudget(apiBuckets, getClientKey(req), 60, 60 * 1000);
+  if (!budget.allowed) {
+    res.setHeader('Retry-After', String(Math.ceil((budget.resetAt - Date.now()) / 1000)));
+    return res.status(429).json({ error: 'Too many requests. Please try again soon.' });
+  }
+  next();
+}
+
+function authRateLimit(req, res, next) {
+  const email = normalizeEmail(req.body?.email);
+  const key = `${getClientKey(req)}:${statsIdentity(email) || 'none'}`;
+  const budget = takeWindowBudget(authBuckets, key, 5, 15 * 60 * 1000);
+  if (!budget.allowed) {
+    res.setHeader('Retry-After', String(Math.ceil((budget.resetAt - Date.now()) / 1000)));
+    return res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+  }
+  next();
 }
 
 function takeGenerationSlot(key) {
@@ -129,278 +378,83 @@ function takeGenerationSlot(key) {
 
 function releaseGenerationSlot(key) {
   const active = activeGenerationCounts.get(key) || 0;
-  if (active <= 1) {
-    activeGenerationCounts.delete(key);
-  } else {
-    activeGenerationCounts.set(key, active - 1);
-  }
+  if (active <= 1) activeGenerationCounts.delete(key);
+  else activeGenerationCounts.set(key, active - 1);
 }
 
-function normalizeUserPrompt(prompt, maxLength = MAX_PROMPT_LENGTH) {
-  if (prompt === undefined || prompt === null) return '';
-  if (typeof prompt !== 'string') {
-    throw new HttpError(400, 'Prompt must be text');
+async function getOrCreateUser(email, declaredFreeUsed) {
+  let { data: user, error: findError } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+  if (findError) throw new Error('Database error loading user');
+
+  if (!user) {
+    const { data, error } = await supabase
+      .from('users')
+      .insert({ email, free_generations_used: declaredFreeUsed, paid_credits: 0 })
+      .select('*')
+      .maybeSingle();
+    if (error) throw new Error('Database error creating user');
+    user = data;
+    appendStatsEvent('user_created', { emailHash: statsIdentity(email), maskedEmail: maskEmail(email) });
+  } else if (declaredFreeUsed > (user.free_generations_used || 0) && (user.paid_credits || 0) <= 0) {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ free_generations_used: declaredFreeUsed })
+      .eq('email', email)
+      .select('*')
+      .maybeSingle();
+    if (!error && data) user = data;
   }
-  const normalized = prompt.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
-  if (normalized.length > maxLength) {
-    throw new HttpError(400, 'Prompt is too long');
-  }
-  return normalized;
+  return user;
 }
 
-const apiBuckets = new Map();
-function apiRateLimit(req, res, next) {
-  const key = getClientKey(req);
-  const now = Date.now();
-  const windowMs = 60 * 1000;
-  const maxRequests = 30;
-  const bucket = apiBuckets.get(key) || { count: 0, resetAt: now + windowMs };
-
-  if (now > bucket.resetAt) {
-    bucket.count = 0;
-    bucket.resetAt = now + windowMs;
-  }
-
-  bucket.count += 1;
-  apiBuckets.set(key, bucket);
-
-  if (bucket.count > maxRequests) {
-    return res.status(429).json({ error: 'Too many requests. Please try again soon.' });
-  }
-
-  next();
-}
-
-function normalizeEmail(email) {
-  return typeof email === 'string' ? email.trim().toLowerCase() : '';
-}
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
-
-function getImageMimeFromMagic(buffer) {
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-    return 'image/jpeg';
-  }
-  if (
-    buffer.length >= 8 &&
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47 &&
-    buffer[4] === 0x0d &&
-    buffer[5] === 0x0a &&
-    buffer[6] === 0x1a &&
-    buffer[7] === 0x0a
-  ) {
-    return 'image/png';
-  }
-  if (
-    buffer.length >= 12 &&
-    buffer.toString('ascii', 0, 4) === 'RIFF' &&
-    buffer.toString('ascii', 8, 12) === 'WEBP'
-  ) {
-    return 'image/webp';
-  }
-  return '';
-}
-
-function parseImagePayload(image, declaredMimeType) {
-  if (!image || typeof image !== 'string') {
-    throw new HttpError(400, 'Image is required');
-  }
-
-  let base64Data = image;
-  let dataUrlMime = '';
-  const dataUrlMatch = image.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
-  if (dataUrlMatch) {
-    dataUrlMime = dataUrlMatch[1].toLowerCase();
-    base64Data = dataUrlMatch[2];
-  }
-
-  const normalizedBase64 = base64Data.replace(/\s/g, '');
-  if (!/^[a-z0-9+/]+={0,2}$/i.test(normalizedBase64)) {
-    throw new HttpError(400, 'Invalid image data');
-  }
-  if (normalizedBase64.length > 18 * 1024 * 1024) {
-    throw new HttpError(413, 'Image is too large');
-  }
-
-  const buffer = Buffer.from(normalizedBase64, 'base64');
-  if (!buffer.length) {
-    throw new HttpError(400, 'Invalid image data');
-  }
-
-  const detectedMimeType = getImageMimeFromMagic(buffer);
-  if (!detectedMimeType) {
-    throw new HttpError(400, 'Unsupported image type');
-  }
-
-  const mimeType = (dataUrlMime || declaredMimeType || detectedMimeType).toLowerCase().replace('image/jpg', 'image/jpeg');
-  if (mimeType !== detectedMimeType) {
-    throw new HttpError(400, 'Image type does not match the file data');
-  }
-
-  return { base64Data: normalizedBase64, mimeType: detectedMimeType };
-}
-
-function sendRouteError(res, label, err) {
-  const status = err.status || 500;
-  if (status >= 500) {
-    console.error(`[${label}] Error:`, err.message);
-  }
-  res.status(status).json({ error: status >= 500 && isProduction ? 'Internal server error' : err.message });
-}
-
-function maskEmail(email) {
-  const [name = '', domain = ''] = String(email || '').split('@');
-  return `${name.slice(0, 2)}***@${domain}`;
-}
-
-function appendStatsEvent(type, payload = {}) {
-  const event = {
-    ts: new Date().toISOString(),
-    type,
-    ...payload
-  };
-  fs.appendFile(STATS_EVENTS_FILE, `${JSON.stringify(event)}\n`, err => {
-    if (err) console.error('[Stats] Failed to write event:', err.message);
-  });
-}
-
-function readStatsEvents(start, end) {
-  try {
-    return fs.readFileSync(STATS_EVENTS_FILE, 'utf8')
-      .split('\n')
-      .filter(Boolean)
-      .map(line => {
-        try {
-          return JSON.parse(line);
-        } catch {
-          return null;
-        }
-      })
-      .filter(event => event && event.ts && event.ts >= start.toISOString() && event.ts < end.toISOString());
-  } catch {
-    return [];
-  }
-}
-
-function timeZoneOffsetMs(timeZone, date) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23'
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  const asUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-    Number(values.hour),
-    Number(values.minute),
-    Number(values.second)
-  );
-  return asUtc - date.getTime();
-}
-
-function zonedDayToUtc(year, month, day, timeZone) {
-  const guess = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-  const offset = timeZoneOffsetMs(timeZone, guess);
-  return new Date(guess.getTime() - offset);
-}
-
-function getStatsRange(dateParam) {
-  const now = new Date();
-  let year;
-  let month;
-  let day;
-
-  if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-    [year, month, day] = dateParam.split('-').map(Number);
-  } else {
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: STATS_TIME_ZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(yesterday);
-    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-    year = Number(values.year);
-    month = Number(values.month);
-    day = Number(values.day);
-  }
-
-  const start = zonedDayToUtc(year, month, day, STATS_TIME_ZONE);
-  const nextDay = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0));
-  const end = zonedDayToUtc(nextDay.getUTCFullYear(), nextDay.getUTCMonth() + 1, nextDay.getUTCDate(), STATS_TIME_ZONE);
-  const label = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-  return { start, end, label };
-}
-
-function isAdminRequest(req) {
-  const configuredToken = process.env.ADMIN_STATS_TOKEN;
-  if (!configuredToken) return false;
-  const auth = req.headers.authorization || '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const token = bearer || req.headers['x-admin-token'] || req.query.token;
-  return token === configuredToken;
+async function buildUserSummary(email, declaredFreeUsed = 0) {
+  const user = await getOrCreateUser(email, declaredFreeUsed);
+  const freeUsed = user?.free_generations_used || 0;
+  const paidCredits = user?.paid_credits || 0;
+  const credits = Math.max(0, FREE_TRIAL_LIMIT - freeUsed) + paidCredits;
+  const { count, error } = await supabase
+    .from('generations')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_email', email);
+  if (error) throw new Error('Database error loading account');
+  return { email, credits, hasPaid: paidCredits > 0 || (count || 0) > 0 };
 }
 
 async function sendPurchaseWebhook(payload) {
   const webhookUrl = process.env.N8N_PURCHASE_WEBHOOK_URL;
   if (!webhookUrl) return;
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    await fetch(webhookUrl, {
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(process.env.N8N_WEBHOOK_SECRET ? { 'X-ShotMe-Secret': process.env.N8N_WEBHOOK_SECRET } : {})
+        ...(process.env.N8N_WEBHOOK_SECRET ? { 'X-ShotMe-Secret': process.env.N8N_WEBHOOK_SECRET } : {}),
       },
       body: JSON.stringify(payload),
-      signal: controller.signal
+      signal: controller.signal,
     });
+    if (!response.ok) console.error(`[n8n] Purchase webhook returned ${response.status}`);
   } catch (err) {
-    console.error('[n8n] Purchase webhook failed:', err.message);
+    console.error('[n8n] Purchase webhook failed:', err.name);
   } finally {
     clearTimeout(timeout);
   }
 }
 
 function loadProcessedStripeEvents() {
-  try {
-    return new Set(JSON.parse(fs.readFileSync(STRIPE_EVENTS_FILE, 'utf8')));
-  } catch {
-    return new Set();
-  }
+  try { return new Set(JSON.parse(fs.readFileSync(STRIPE_EVENTS_FILE, 'utf8'))); }
+  catch { return new Set(); }
 }
 
 function markStripeEventProcessed(ids) {
   const processed = loadProcessedStripeEvents();
   ids.filter(Boolean).forEach(id => processed.add(id));
-  fs.writeFileSync(STRIPE_EVENTS_FILE, JSON.stringify([...processed].slice(-1000)));
+  writeJsonAtomic(STRIPE_EVENTS_FILE, [...processed].slice(-2000));
 }
 
 let stripeWebhookQueue = Promise.resolve();
-
 function enqueueStripeWebhook(task) {
   const next = stripeWebhookQueue.then(task, task);
   stripeWebhookQueue = next.catch(() => {});
@@ -411,62 +465,50 @@ async function handleCheckoutCompleted(event) {
   const session = event.data.object;
   const sessionId = session.id;
   const processed = loadProcessedStripeEvents();
-  if (processed.has(event.id) || processed.has(sessionId)) {
-    return { duplicate: true };
-  }
+  if (processed.has(event.id) || processed.has(sessionId)) return { duplicate: true };
 
   const email = normalizeEmail(session.customer_email);
   const plan = PLANS[session.metadata?.planId];
-  const amount = plan?.credits || 0;
-
-  if (session.payment_status !== 'paid' || !isValidEmail(email) || amount <= 0) {
-    return { ignored: true };
-  }
+  const validPayment =
+    session.payment_status === 'paid' &&
+    isValidEmail(email) &&
+    plan &&
+    session.currency === 'eur' &&
+    Number(session.amount_total) === plan.amountCents;
+  if (!validPayment) return { ignored: true };
 
   const { data: user, error: findError } = await supabase
     .from('users')
     .select('credits, paid_credits')
     .eq('email', email)
     .maybeSingle();
-
-  if (findError) {
-    console.error('[Stripe] User lookup failed:', findError);
-    throw new Error('User lookup failed');
-  }
-
+  if (findError) throw new Error('User lookup failed');
   if (!user) return { ignored: true };
 
   const processedBeforeUpdate = loadProcessedStripeEvents();
-  if (processedBeforeUpdate.has(event.id) || processedBeforeUpdate.has(sessionId)) {
-    return { duplicate: true };
-  }
+  if (processedBeforeUpdate.has(event.id) || processedBeforeUpdate.has(sessionId)) return { duplicate: true };
 
   const { error: updateError } = await supabase.from('users').update({
-    credits: (user.credits || 0) + amount,
-    paid_credits: (user.paid_credits || 0) + amount
+    credits: (user.credits || 0) + plan.credits,
+    paid_credits: (user.paid_credits || 0) + plan.credits,
   }).eq('email', email);
-
-  if (updateError) {
-    console.error('[Stripe] Credit update failed:', updateError);
-    throw new Error('Credit update failed');
-  }
+  if (updateError) throw new Error('Credit update failed');
 
   markStripeEventProcessed([event.id, sessionId]);
-  console.log(`[Stripe] Added ${amount} credits for ${email} (${sessionId})`);
   const purchasePayload = {
     type: 'purchase_completed',
-    email,
+    emailHash: statsIdentity(email),
     maskedEmail: maskEmail(email),
     planId: session.metadata?.planId || '',
-    credits: amount,
+    credits: plan.credits,
     amountTotal: session.amount_total || 0,
     currency: session.currency || 'eur',
-    sessionId,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
+  console.log(`[Stripe] Added ${plan.credits} credits for ${maskEmail(email)}`);
   appendStatsEvent('purchase_completed', purchasePayload);
   await sendPurchaseWebhook(purchasePayload);
-  return { credited: amount };
+  return { credited: plan.credits };
 }
 
 async function generateImage(parts) {
@@ -475,9 +517,8 @@ async function generateImage(parts) {
     'gemini-3.1-flash-image',
     'gemini-2.5-flash-image',
     'gemini-3.1-flash-image-preview',
-    'gemini-3-pro-image-preview'
+    'gemini-3-pro-image-preview',
   ].filter((model, index, list) => model && list.indexOf(model) === index);
-
   let lastText = '';
   let lastError = null;
 
@@ -486,198 +527,301 @@ async function generateImage(parts) {
       const response = await ai.models.generateContent({
         model,
         contents: [{ role: 'user', parts }],
-        config: { responseModalities: ['TEXT', 'IMAGE'] }
+        config: { responseModalities: ['TEXT', 'IMAGE'] },
       });
-
       const responseParts = response.candidates?.[0]?.content?.parts || [];
-      const genImg = responseParts.find(p => p.inlineData)?.inlineData?.data;
+      const genImg = responseParts.find(part => part.inlineData)?.inlineData?.data;
       if (genImg) return genImg;
-
-      lastText = responseParts.map(p => p.text).filter(Boolean).join(' ').slice(0, 500);
-      console.error(`[Gemini] ${model} returned no image. Text: ${lastText || 'none'}`);
+      lastText = responseParts.map(part => part.text).filter(Boolean).join(' ').slice(0, 300);
+      console.error(`[Gemini] ${model} returned no image`);
     } catch (err) {
       lastError = err;
-      console.error(`[Gemini] ${model} failed:`, err.message);
+      console.error(`[Gemini] ${model} failed: ${err.name || 'Error'}`);
     }
   }
-
   if (lastError) throw lastError;
-  throw new Error(lastText || 'Gemini did not return an image. Please try another photo or style.');
+  throw new Error(lastText || 'Gemini did not return an image');
 }
 
-// Webhook must be before express.json()
-app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(), payment=(), usb=()');
+  if (isProduction) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  const policy = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "frame-src https://checkout.stripe.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self' https://checkout.stripe.com",
+    "frame-ancestors 'none'",
+    "manifest-src 'self'",
+    "worker-src 'self' blob:",
+    ...(isProduction ? ['upgrade-insecure-requests'] : []),
+  ];
+  res.setHeader('Content-Security-Policy', policy.join('; '));
+  next();
+});
+
+app.post('/api/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
+  const signature = req.headers['stripe-signature'];
   let event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    event = stripe.webhooks.constructEvent(req.body, signature, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch {
+    return res.status(400).send('Invalid webhook signature');
   }
-
   try {
     if (event.type === 'checkout.session.completed') {
       const result = await enqueueStripeWebhook(() => handleCheckoutCompleted(event));
       return res.json({ received: true, ...result });
     }
+    return res.json({ received: true });
   } catch (err) {
     console.error('[Stripe] Webhook processing failed:', err.message);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Webhook processing failed' });
   }
-
-  res.json({ received: true });
 });
 
 app.use(cors({
+  credentials: true,
   origin(origin, callback) {
     if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-    callback(null, false);
-  }
+    return callback(null, false);
+  },
 }));
-app.use('/api', apiRateLimit);
-app.use(express.json({ limit: maxJsonSize }));
-app.use((err, req, res, next) => {
-  if (err?.type === 'entity.too.large') {
-    return res.status(413).json({ error: 'Request body is too large' });
+
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const origin = req.headers.origin;
+  const fetchSite = req.headers['sec-fetch-site'];
+  if (origin && !allowedOrigins.has(origin)) return res.status(403).json({ error: 'Forbidden origin' });
+  if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite)) {
+    return res.status(403).json({ error: 'Cross-site request blocked' });
   }
+  next();
+});
+app.use('/api', apiRateLimit);
+app.use(express.json({ limit: maxJsonSize, strict: true }));
+app.use((err, _req, res, next) => {
+  if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'Request body is too large' });
+  if (err instanceof SyntaxError && err.status === 400) return res.status(400).json({ error: 'Invalid JSON body' });
   next(err);
 });
 
-app.get('/api/health', (req, res) => res.send('OK'));
+app.get('/api/health', (_req, res) => res.type('text/plain').send('OK'));
 
-app.post('/api/user/check', async (req, res) => {
-  const { email, freeTrialUsed } = req.body;
-  const normalEmail = normalizeEmail(email);
-  if (!isValidEmail(normalEmail)) return res.status(400).json({ error: 'Valid email required' });
-
+app.post('/api/auth/device-session', authRateLimit, async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Valid email required' });
   const declaredFreeUsed = Math.min(
     FREE_TRIAL_LIMIT,
-    Math.max(0, Number.isFinite(Number(freeTrialUsed)) ? Math.floor(Number(freeTrialUsed)) : 0)
+    Math.max(0, Number.isFinite(Number(req.body?.freeTrialUsed)) ? Math.floor(Number(req.body.freeTrialUsed)) : 0),
   );
+  try {
+    const { data: existingUser, error: userError } = await supabase
+      .from('users').select('paid_credits').eq('email', email).maybeSingle();
+    if (userError) throw new Error('Database error loading account');
+    const { count, error: countError } = await supabase
+      .from('generations').select('*', { count: 'exact', head: true }).eq('user_email', email);
+    if (countError) throw new Error('Database error loading account');
 
-  let { data: user, error: findError } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
-  if (findError) console.error('[DB] checkUser find error:', findError);
+    const currentEmail = getSessionEmail(req);
+    const protectedAccount = (existingUser?.paid_credits || 0) > 0 || (count || 0) > 0;
+    if (protectedAccount && currentEmail !== email) {
+      return res.status(401).json({ error: 'EMAIL_VERIFICATION_REQUIRED' });
+    }
 
-  if (!user) {
-    const { data: newUser, error: insertError } = await supabase
-      .from('users')
-      .insert({ email: normalEmail, free_generations_used: declaredFreeUsed, paid_credits: 0 })
-      .select('*')
-      .maybeSingle();
-    if (insertError) {
-      console.error('[DB] checkUser insert error:', insertError);
-      return res.status(500).json({ error: 'Database error creating user.' });
+    await getOrCreateUser(email, declaredFreeUsed);
+    if (currentEmail !== email) {
+      const token = sessionStore.issue(email, { replace: !protectedAccount });
+      setSessionCookie(res, token);
     }
-    user = newUser;
-    appendStatsEvent('user_created', { email: normalEmail, maskedEmail: maskEmail(normalEmail) });
-  } else if (declaredFreeUsed > (user.free_generations_used || 0) && (user.paid_credits || 0) <= 0) {
-    const { data: updatedUser, error: updateError } = await supabase
-      .from('users')
-      .update({ free_generations_used: declaredFreeUsed })
-      .eq('email', normalEmail)
-      .select('*')
-      .maybeSingle();
-    if (updateError) {
-      console.error('[DB] checkUser update free usage error:', updateError);
-    } else if (updatedUser) {
-      user = updatedUser;
-    }
+    res.json({ email });
+  } catch (err) {
+    sendRouteError(res, 'Device session', err);
   }
-
-  const freeUsed = user?.free_generations_used || 0;
-  const paidCredits = user?.paid_credits || 0;
-  const credits = Math.max(0, FREE_TRIAL_LIMIT - freeUsed) + paidCredits;
-  
-  const { count } = await supabase.from('generations').select('*', { count: 'exact', head: true }).eq('user_email', normalEmail);
-  const hasPaid = paidCredits > 0 || (count > 0);
-
-  res.json({ email: normalEmail, credits, hasPaid });
 });
 
-app.post('/api/generate', async (req, res) => {
-  const { image, mimeType, style, aspectRatio, prompt, email } = req.body;
+app.post('/api/auth/request-link', authRateLimit, async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Valid email required' });
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true, emailRedirectTo: `${frontendUrl}/` },
+    });
+    if (error) {
+      if (error.code === 'email_address_not_authorized') {
+        return res.status(503).json({ error: 'EMAIL_DELIVERY_NOT_CONFIGURED' });
+      }
+      throw error;
+    }
+    res.json({ sent: true });
+  } catch (err) {
+    sendRouteError(res, 'Auth link', err);
+  }
+});
 
-  const normalEmail = normalizeEmail(email);
-  const hasEmail = Boolean(normalEmail);
-  if (email && !isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
+app.post('/api/auth/session', authRateLimit, async (req, res) => {
+  const accessToken = req.body?.accessToken;
+  if (typeof accessToken !== 'string' || accessToken.length < 20 || accessToken.length > 4096) {
+    return res.status(400).json({ error: 'Invalid login token' });
+  }
+  try {
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    const email = normalizeEmail(data?.user?.email);
+    if (error || !isValidEmail(email)) return res.status(401).json({ error: 'Invalid or expired login link' });
+    const token = sessionStore.issue(email);
+    setSessionCookie(res, token);
+    res.json({ email });
+  } catch (err) {
+    sendRouteError(res, 'Auth session', err);
+  }
+});
 
+app.get('/api/auth/me', optionalAuth, (req, res) => res.json({ email: req.authEmail || null }));
+
+app.post('/api/auth/logout', optionalAuth, (req, res) => {
+  const token = getSessionToken(req);
+  if (token) sessionStore.revoke(token);
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
+app.post('/api/user/check', requireAuth, async (req, res) => {
+  const declaredFreeUsed = Math.min(
+    FREE_TRIAL_LIMIT,
+    Math.max(0, Number.isFinite(Number(req.body?.freeTrialUsed)) ? Math.floor(Number(req.body.freeTrialUsed)) : 0),
+  );
+  try {
+    res.json(await buildUserSummary(req.authEmail, declaredFreeUsed));
+  } catch (err) {
+    sendRouteError(res, 'User check', err);
+  }
+});
+
+app.post('/api/generate', optionalAuth, async (req, res) => {
+  const { image, mimeType, style, aspectRatio, prompt } = req.body;
+  const email = req.authEmail || null;
+  const hasEmail = Boolean(email);
   const clientKey = getClientKey(req);
-  const generationKey = hasEmail ? `email:${normalEmail}` : `anonymous:${clientKey}`;
+  let anonymousIdentity = null;
   let generationSlotTaken = false;
+  let generationKey = '';
 
   try {
     if (!ALLOWED_STYLES.has(style)) throw new HttpError(400, 'Unsupported style');
     if (!ALLOWED_ASPECT_RATIOS.has(aspectRatio)) throw new HttpError(400, 'Unsupported aspect ratio');
-
     const safePrompt = normalizeUserPrompt(prompt);
     const imagePayload = parseImagePayload(image, mimeType);
-    let user = null;
 
     if (!hasEmail) {
-      const budget = takeWindowBudget(generationBuckets, generationKey, ANONYMOUS_DAILY_GENERATION_LIMIT, 24 * 60 * 60 * 1000);
+      const cookieToken = parseCookies(req.headers.cookie)[ANONYMOUS_COOKIE];
+      anonymousIdentity = anonymousUsageStore.getOrIssue(cookieToken);
+      if (anonymousIdentity.isNew) {
+        appendSetCookie(res, serializeCookie(ANONYMOUS_COOKIE, anonymousIdentity.token, {
+          maxAge: ANONYMOUS_MAX_AGE_SECONDS,
+          secure: isProduction,
+          sameSite: 'Lax',
+        }));
+      }
+      if (anonymousIdentity.count >= FREE_TRIAL_LIMIT) throw new HttpError(403, 'FREE_TRIAL_EXHAUSTED');
+      const budget = takeWindowBudget(
+        generationBuckets,
+        `ip:${clientKey}`,
+        ANONYMOUS_DAILY_GENERATION_LIMIT,
+        24 * 60 * 60 * 1000,
+      );
       if (!budget.allowed) {
         res.setHeader('Retry-After', String(Math.ceil((budget.resetAt - Date.now()) / 1000)));
-        throw new HttpError(429, 'Free daily limit reached. Please try again later or continue with email.');
+        throw new HttpError(429, 'Free daily limit reached. Please try again later.');
       }
+      generationKey = `anonymous:${hashToken(anonymousIdentity.token)}`;
+    } else {
+      generationKey = `email:${email}`;
     }
 
-    if (!takeGenerationSlot(generationKey)) {
-      throw new HttpError(429, 'Another generation is already running. Please wait a moment.');
-    }
+    if (!takeGenerationSlot(generationKey)) throw new HttpError(429, 'Another generation is already running.');
     generationSlotTaken = true;
 
+    let user = null;
     if (hasEmail) {
-      const { data } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
+      const { data, error } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+      if (error) throw new Error('Database error loading account');
       user = data;
-      if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
-
-      const credits = Math.max(0, FREE_TRIAL_LIMIT - (user.free_generations_used || 0)) + (user.paid_credits || 0);
-      if (credits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+      const credits = user ? Math.max(0, FREE_TRIAL_LIMIT - (user.free_generations_used || 0)) + (user.paid_credits || 0) : 0;
+      if (!user || credits <= 0) throw new HttpError(403, 'OUT_OF_CREDITS');
     }
 
     const isRestorationStyle = style === 'RESTORE_OLD_PHOTO';
     const generationPrompt = isRestorationStyle
-      ? `${RESTORATION_PROMPT}
-Additional historical context from user, if any: ${safePrompt || 'none'}`
-      : `${MASTER_PROMPT}
-Style: ${style}. ${safePrompt || ''}`;
-
+      ? `${RESTORATION_PROMPT}\nAdditional historical context from user, if any: ${safePrompt || 'none'}`
+      : `${MASTER_PROMPT}\nStyle: ${style}. ${safePrompt || ''}`;
     const genImg = await generateImage([
       { text: generationPrompt },
-      { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } }
+      { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } },
     ]);
 
-    if (genImg) {
-      let usedPaidCredit = false;
-
-      if (hasEmail && user) {
-        if ((user.paid_credits || 0) > 0) {
-          await supabase.from('users').update({ paid_credits: user.paid_credits - 1 }).eq('email', normalEmail);
-          usedPaidCredit = true;
-        } else {
-          await supabase.from('users').update({ free_generations_used: (user.free_generations_used || 0) + 1 }).eq('email', normalEmail);
-        }
-
-        if (usedPaidCredit) {
-          await supabase.from('generations').insert({
-            user_email: normalEmail, style_name: style, aspect_ratio: aspectRatio,
-            generated_image_url: `data:image/jpeg;base64,${genImg}`, status: 'success'
-          });
-        }
+    let usedPaidCredit = false;
+    if (hasEmail && user) {
+      if ((user.paid_credits || 0) > 0) {
+        const { data: updated, error } = await supabase
+          .from('users')
+          .update({ paid_credits: user.paid_credits - 1 })
+          .eq('email', email)
+          .eq('paid_credits', user.paid_credits)
+          .select('paid_credits')
+          .maybeSingle();
+        if (error || !updated) throw new Error('Credit update conflict');
+        usedPaidCredit = true;
+      } else {
+        const freeUsed = user.free_generations_used || 0;
+        const { data: updated, error } = await supabase
+          .from('users')
+          .update({ free_generations_used: freeUsed + 1 })
+          .eq('email', email)
+          .eq('free_generations_used', freeUsed)
+          .select('free_generations_used')
+          .maybeSingle();
+        if (error || !updated) throw new Error('Credit update conflict');
       }
-
-      appendStatsEvent('generation_success', {
-        email: hasEmail ? normalEmail : null,
-        maskedEmail: hasEmail ? maskEmail(normalEmail) : null,
-        action: 'generate',
-        style,
-        creditType: usedPaidCredit ? 'paid' : 'free',
-        mode: hasEmail ? 'email' : 'anonymous'
-      });
-      res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
-    } else {
-      throw new Error('Gemini failed to generate image');
+      if (usedPaidCredit) {
+        const { error } = await supabase.from('generations').insert({
+          user_email: email,
+          style_name: style,
+          aspect_ratio: aspectRatio,
+          generated_image_url: `data:image/jpeg;base64,${genImg}`,
+          status: 'success',
+        });
+        if (error) console.error('[Gallery] Failed to save generated image');
+      }
+    } else if (anonymousIdentity) {
+      anonymousUsageStore.increment(anonymousIdentity.token);
     }
+
+    appendStatsEvent('generation_success', {
+      emailHash: email ? statsIdentity(email) : null,
+      maskedEmail: email ? maskEmail(email) : null,
+      action: 'generate',
+      style,
+      creditType: usedPaidCredit ? 'paid' : 'free',
+      mode: hasEmail ? 'email' : 'anonymous',
+    });
+    res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {
     sendRouteError(res, 'Generate', err);
   } finally {
@@ -685,278 +829,222 @@ Style: ${style}. ${safePrompt || ''}`;
   }
 });
 
-app.post('/api/refine', async (req, res) => {
-  const { image, prompt, email } = req.body;
-  const normalEmail = normalizeEmail(email);
-  if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
-
+app.post('/api/refine', requireAuth, async (req, res) => {
+  const email = req.authEmail;
+  const generationKey = `email:${email}`;
+  let generationSlotTaken = false;
   try {
-    const safePrompt = normalizeUserPrompt(prompt, MAX_REFINE_PROMPT_LENGTH);
-    const imagePayload = parseImagePayload(image);
+    const safePrompt = normalizeUserPrompt(req.body?.prompt, MAX_REFINE_PROMPT_LENGTH);
+    if (!safePrompt) throw new HttpError(400, 'Correction request is required');
+    const imagePayload = parseImagePayload(req.body?.image);
+    if (!takeGenerationSlot(generationKey)) throw new HttpError(429, 'Another generation is already running.');
+    generationSlotTaken = true;
 
-    const { data: user } = await supabase.from('users').select('*').eq('email', normalEmail).maybeSingle();
-    if (!user) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
-
+    const { data: user, error: userError } = await supabase.from('users').select('paid_credits').eq('email', email).maybeSingle();
+    if (userError) throw new Error('Database error loading account');
     const paidCredits = user?.paid_credits || 0;
-    if (paidCredits <= 0) return res.status(403).json({ error: 'OUT_OF_CREDITS' });
+    if (paidCredits <= 0) throw new HttpError(403, 'OUT_OF_CREDITS');
 
     const genImg = await generateImage([
-      { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${safePrompt || ''}` },
-      { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } }
+      { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${safePrompt}` },
+      { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } },
     ]);
-
-    if (genImg) {
-      await supabase.from('users').update({ paid_credits: paidCredits - 1 }).eq('email', normalEmail);
-      appendStatsEvent('generation_success', {
-        email: normalEmail,
-        maskedEmail: maskEmail(normalEmail),
-        action: 'refine',
-        creditType: 'paid'
-      });
-      res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
-    } else {
-      throw new Error('Gemini failed to refine image');
-    }
+    const { data: updated, error } = await supabase
+      .from('users')
+      .update({ paid_credits: paidCredits - 1 })
+      .eq('email', email)
+      .eq('paid_credits', paidCredits)
+      .select('paid_credits')
+      .maybeSingle();
+    if (error || !updated) throw new Error('Credit update conflict');
+    appendStatsEvent('generation_success', {
+      emailHash: statsIdentity(email), maskedEmail: maskEmail(email), action: 'refine', creditType: 'paid',
+    });
+    res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {
     sendRouteError(res, 'Refine', err);
+  } finally {
+    if (generationSlotTaken) releaseGenerationSlot(generationKey);
   }
 });
 
-app.post('/api/transcribe', async (req, res) => {
-  const { audio, mimeType, email } = req.body;
-  const normalEmail = normalizeEmail(email);
-  if (!isValidEmail(normalEmail)) return res.status(401).json({ error: 'Valid email is required' });
-  if (!audio || typeof audio !== 'string' || audio.length > 8 * 1024 * 1024) {
-    return res.status(400).json({ error: 'Invalid audio payload' });
-  }
-  if (mimeType && !/^audio\/(webm|mp4|mpeg|wav|ogg)/i.test(mimeType)) {
-    return res.status(400).json({ error: 'Unsupported audio type' });
-  }
-
+app.post('/api/transcribe', requireAuth, async (req, res) => {
+  const email = req.authEmail;
   try {
-    const { data: user } = await supabase.from('users').select('paid_credits').eq('email', normalEmail).maybeSingle();
-    const { count } = await supabase.from('generations').select('*', { count: 'exact', head: true }).eq('user_email', normalEmail);
-    const hasPaid = (user?.paid_credits > 0) || (count > 0);
+    const audioPayload = parseAudioPayload(req.body?.audio, req.body?.mimeType);
+    const { data: user, error: userError } = await supabase.from('users').select('paid_credits').eq('email', email).maybeSingle();
+    if (userError) throw new Error('Database error loading account');
+    if ((user?.paid_credits || 0) <= 0) throw new HttpError(403, 'VOICE_PREMIUM_ONLY');
 
-    if (!hasPaid) return res.status(403).json({ error: 'VOICE_PREMIUM_ONLY' });
-
-    const textModels = [TEXT_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash'].filter((model, index, list) => model && list.indexOf(model) === index);
+    const textModels = [TEXT_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash']
+      .filter((model, index, list) => model && list.indexOf(model) === index);
     let result;
     let lastError;
     for (const model of textModels) {
       try {
         result = await ai.models.generateContent({
           model,
-          contents: [{
-            role: 'user',
-            parts: [
-              { inlineData: { mimeType: mimeType || 'audio/webm', data: audio } },
-              { text: 'Transcribe this audio to text. Output ONLY the transcription.' }
-            ]
-          }]
+          contents: [{ role: 'user', parts: [
+            { inlineData: { mimeType: audioPayload.mimeType, data: audioPayload.base64Data } },
+            { text: 'Transcribe this audio to text. Output ONLY the transcription.' },
+          ] }],
         });
         break;
       } catch (err) {
         lastError = err;
-        console.error(`[Transcribe] ${model} failed:`, err.message);
+        console.error(`[Transcribe] ${model} failed: ${err.name || 'Error'}`);
       }
     }
-
     if (!result && lastError) throw lastError;
-
-    res.json({ text: (result.text || '').trim() });
+    res.json({ text: (result?.text || '').trim().slice(0, MAX_REFINE_PROMPT_LENGTH) });
   } catch (err) {
-    console.error('[Transcribe] Error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendRouteError(res, 'Transcribe', err);
   }
 });
 
-app.post('/api/payment/create-session', async (req, res) => {
-  const { email, planId } = req.body;
-  const normalEmail = normalizeEmail(email);
-  const plan = PLANS[planId];
-  if (!isValidEmail(normalEmail)) return res.status(400).json({ error: 'Valid email required' });
-  if (!plan || !plan.priceId) return res.status(400).json({ error: 'Invalid payment plan' });
-
+app.post('/api/payment/create-session', requireAuth, async (req, res) => {
+  const email = req.authEmail;
+  const plan = PLANS[req.body?.planId];
+  if (!plan?.priceId) return res.status(400).json({ error: 'Invalid payment plan' });
   try {
     const session = await stripe.checkout.sessions.create({
-      customer_email: normalEmail,
+      customer_email: email,
+      client_reference_id: statsIdentity(email),
       line_items: [{ price: plan.priceId, quantity: 1 }],
       mode: 'payment',
       success_url: `${frontendUrl}/?payment=success`,
       cancel_url: `${frontendUrl}/?payment=cancel`,
-      metadata: { planId, credits: String(plan.credits) }
+      metadata: { planId: req.body.planId, credits: String(plan.credits) },
     });
     res.json({ url: session.url });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendRouteError(res, 'Payment session', err);
   }
 });
 
-app.get('/api/history', async (req, res) => {
-  const normalEmail = normalizeEmail(req.query.email);
-  if (!isValidEmail(normalEmail)) return res.status(400).json({ error: 'Valid email required' });
-
+app.get('/api/history', requireAuth, async (req, res) => {
+  const email = req.authEmail;
   try {
     const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('paid_credits')
-      .eq('email', normalEmail)
-      .maybeSingle();
-
-    if (userError) {
-      console.error('[DB] history user lookup error:', userError);
-      return res.status(500).json({ error: 'Database error loading gallery.' });
-    }
-
+      .from('users').select('paid_credits').eq('email', email).maybeSingle();
+    if (userError) throw new Error('Database error loading gallery');
     const { count, error: countError } = await supabase
-      .from('generations')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_email', normalEmail);
-
-    if (countError) {
-      console.error('[DB] history count error:', countError);
-      return res.status(500).json({ error: 'Database error loading gallery.' });
-    }
-
+      .from('generations').select('*', { count: 'exact', head: true }).eq('user_email', email);
+    if (countError) throw new Error('Database error loading gallery');
     const hasGalleryAccess = (user?.paid_credits || 0) > 0 || (count || 0) > 0;
-    if (!hasGalleryAccess) return res.status(403).json({ error: 'HISTORY_PREMIUM_ONLY' });
+    if (!hasGalleryAccess) throw new HttpError(403, 'HISTORY_PREMIUM_ONLY');
 
-    const { data: generations, error: historyError } = await supabase
+    const { data: generations, error } = await supabase
       .from('generations')
       .select('id, created_at, style_name, aspect_ratio, generated_image_url')
-      .eq('user_email', normalEmail)
+      .eq('user_email', email)
       .eq('status', 'success')
       .order('created_at', { ascending: false })
       .limit(60);
-
-    if (historyError) {
-      console.error('[DB] history load error:', historyError);
-      return res.status(500).json({ error: 'Database error loading gallery.' });
-    }
-
+    if (error) throw new Error('Database error loading gallery');
     res.json({ generations: generations || [] });
   } catch (err) {
-    console.error('[History] Error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendRouteError(res, 'History', err);
   }
 });
 
 app.get('/api/admin/daily-stats', async (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: 'Forbidden' });
-
   try {
     const { start, end, label } = getStatsRange(req.query.date);
     const startIso = start.toISOString();
     const endIso = end.toISOString();
-
     const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('email, created_at')
-      .gte('created_at', startIso)
-      .lt('created_at', endIso);
-
-    if (usersError) {
-      console.error('[Stats] Users query failed:', usersError);
-      return res.status(500).json({ error: 'Failed to load user stats' });
-    }
+      .from('users').select('email, created_at').gte('created_at', startIso).lt('created_at', endIso);
+    if (usersError) throw new Error('Failed to load user stats');
 
     const sessions = await stripe.checkout.sessions.list({
       limit: 100,
-      created: {
-        gte: Math.floor(start.getTime() / 1000),
-        lt: Math.floor(end.getTime() / 1000)
-      }
+      created: { gte: Math.floor(start.getTime() / 1000), lt: Math.floor(end.getTime() / 1000) },
     });
-
     const paidSessions = sessions.data.filter(session => session.payment_status === 'paid');
     const purchaseEmails = new Set(paidSessions.map(session => normalizeEmail(session.customer_email)).filter(Boolean));
     const newUserEmails = new Set((users || []).map(user => normalizeEmail(user.email)).filter(Boolean));
-    const freeModeUsers = [...newUserEmails].filter(email => !purchaseEmails.has(email)).length;
-    const revenueCents = paidSessions.reduce((sum, session) => sum + (session.amount_total || 0), 0);
-    const purchasedCredits = paidSessions.reduce((sum, session) => sum + Number(session.metadata?.credits || 0), 0);
-
     const events = readStatsEvents(start, end);
     const generationEvents = events.filter(event => event.type === 'generation_success');
     const freeGenerationEvents = generationEvents.filter(event => event.creditType === 'free');
     const paidGenerationEvents = generationEvents.filter(event => event.creditType === 'paid');
+    const revenueCents = paidSessions.reduce((sum, session) => sum + (session.amount_total || 0), 0);
 
     const stats = {
       date: label,
       timeZone: STATS_TIME_ZONE,
       range: { start: startIso, end: endIso },
       newUsers: newUserEmails.size,
-      freeModeUsers,
+      freeModeUsers: [...newUserEmails].filter(email => !purchaseEmails.has(email)).length,
       purchases: paidSessions.length,
       revenueEur: revenueCents / 100,
-      purchasedCredits,
+      purchasedCredits: paidSessions.reduce((sum, session) => sum + Number(session.metadata?.credits || 0), 0),
       freeGenerations: freeGenerationEvents.length,
       paidGenerations: paidGenerationEvents.length,
       totalGenerations: generationEvents.length,
-      activeFreeUsers: new Set(freeGenerationEvents.map(event => event.email).filter(Boolean)).size,
-      activePaidUsers: new Set(paidGenerationEvents.map(event => event.email).filter(Boolean)).size
+      activeFreeUsers: new Set(freeGenerationEvents.map(event => event.emailHash).filter(Boolean)).size,
+      activePaidUsers: new Set(paidGenerationEvents.map(event => event.emailHash).filter(Boolean)).size,
     };
-
     const text = [
-      `ShotMe статистика за ${stats.date}`,
-      '',
-      `Новые пользователи: ${stats.newUsers}`,
-      `Пользователей в бесплатном режиме: ${stats.freeModeUsers}`,
-      `Покупок: ${stats.purchases}`,
-      `Выручка: ${stats.revenueEur.toFixed(2)} EUR`,
-      `Куплено генераций: ${stats.purchasedCredits}`,
-      '',
-      `Бесплатных генераций: ${stats.freeGenerations}`,
-      `Платных генераций: ${stats.paidGenerations}`,
-      `Всего генераций: ${stats.totalGenerations}`,
-      '',
-      `Активных бесплатных пользователей: ${stats.activeFreeUsers}`,
-      `Активных платных пользователей: ${stats.activePaidUsers}`
+      `ShotMe statistics for ${stats.date}`,
+      `New users: ${stats.newUsers}`,
+      `Free users: ${stats.freeModeUsers}`,
+      `Purchases: ${stats.purchases}`,
+      `Revenue: ${stats.revenueEur.toFixed(2)} EUR`,
+      `Free generations: ${stats.freeGenerations}`,
+      `Paid generations: ${stats.paidGenerations}`,
     ].join('\n');
-
     res.json({ stats, text });
   } catch (err) {
-    console.error('[Stats] Error:', err.message);
-    res.status(500).json({ error: 'Failed to build stats' });
+    sendRouteError(res, 'Stats', err);
   }
 });
 
-// Static files
-app.get('/robots.txt', (req, res) => {
+app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found' }));
+
+app.get('/robots.txt', (_req, res) => {
   res.type('text/plain').send('User-agent: *\nAllow: /\nSitemap: https://shotme.ee/sitemap.xml\n');
 });
 
-app.get('/sitemap.xml', (req, res) => {
+app.get('/sitemap.xml', (_req, res) => {
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://shotme.ee/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://shotme.ee/privacy-policy.html</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://shotme.ee/terms.html</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
+  <url><loc>https://shotme.ee/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://shotme.ee/privacy-policy.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://shotme.ee/terms.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
 </urlset>`);
 });
 
-app.use('/assets', express.static(path.join(__dirname, '../dist/assets'), {
-  immutable: true,
-  maxAge: '1y'
-}));
-app.use(express.static(path.join(__dirname, '../dist'), {
-  maxAge: '1h'
-}));
-
-app.get('/*splat', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
+app.use((req, res, next) => {
+  if (req.path.split('/').some(segment => segment.startsWith('.'))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  next();
 });
 
-app.listen(port, () => console.log(`Server on ${port}`));
+app.use('/assets', express.static(path.join(__dirname, '../dist/assets'), {
+  immutable: true, maxAge: '1y', dotfiles: 'deny', fallthrough: false,
+}));
+app.use(express.static(path.join(__dirname, '../dist'), {
+  maxAge: '1h', dotfiles: 'deny', index: false,
+}));
+const sendApplicationShell = (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+};
+app.get('/', sendApplicationShell);
+app.get('/*splat', sendApplicationShell);
+
+app.use((err, _req, res, _next) => {
+  if (err instanceof URIError) return res.status(400).json({ error: 'Invalid URL encoding' });
+  if (err?.status === 404) return res.status(404).json({ error: 'Not found' });
+  console.error(`[Unhandled] ${err?.name || 'Error'}: ${err?.message || 'Unknown error'}`);
+  return res.status(500).json({ error: 'Internal server error' });
+});
+
+if (require.main === module) {
+  app.listen(port, host, () => console.log(`Server listening on ${host}:${port}`));
+}
+
+module.exports = app;
