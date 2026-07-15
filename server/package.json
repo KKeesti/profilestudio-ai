@@ -4,7 +4,7 @@
   "description": "ShotMe.ee backend",
   "main": "server.js",
   "scripts": {
-    "test": "node --test --test-isolation=none security.test.js"
+    "test": "node --test --test-isolation=none security.test.js analytics.test.js"
   },
   "keywords": [],
   "author": "",

@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({
   const t = TRANSLATIONS[language];
 
   return (
-    <header className="relative py-12 text-center">
+    <header className="relative py-6 sm:py-12 text-center">
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
 
       <div className="flex justify-between items-center gap-3 px-4 md:px-12 pt-4 absolute top-0 w-full">
@@ -77,16 +77,16 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <div className="mt-12 inline-block mb-4">
+      <div className="hidden sm:inline-block mt-12 mb-4">
         <span className="text-[10px] text-gold uppercase tracking-[0.5em] font-bold border-x border-gold/30 px-6 py-1">
           {t.exclusiveAccess}
         </span>
       </div>
 
-      <h1 className="text-5xl md:text-7xl font-serif text-white mb-4">
+      <h1 className="mt-12 sm:mt-0 text-4xl sm:text-5xl md:text-7xl font-serif text-white mb-2 sm:mb-4">
         Profile <span className="text-gold italic font-light">Studio</span>
       </h1>
-      <p className="text-slate-500 font-light text-[11px] tracking-[0.25em] uppercase mb-6 max-w-md mx-auto leading-relaxed">
+      <p className="hidden sm:block text-slate-500 font-light text-[11px] tracking-[0.25em] uppercase mb-6 max-w-md mx-auto leading-relaxed">
         {t.highEndPhotography}
       </p>
     </header>

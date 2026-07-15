@@ -7,6 +7,7 @@ import PaymentModal from './components/PaymentModal';
 import { GeminiService } from './services/geminiService';
 import { ICONS } from './constants';
 import { TRANSLATIONS } from './translations';
+import { classifyFunnelError, trackFunnel } from './services/analyticsService';
 
 const FREE_TRIAL_LIMIT = 10;
 
@@ -77,6 +78,14 @@ const App: React.FC = () => {
   const premiumFeaturesEnabled = Boolean(userEmail && hasGallery);
 
   useEffect(() => {
+    trackFunnel('page_view', { language, screen: AppStep.UPLOAD });
+  }, []);
+
+  useEffect(() => {
+    trackFunnel('screen_view', { language, screen: step });
+  }, [language, step]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const initializeSession = async () => {
@@ -90,6 +99,11 @@ const App: React.FC = () => {
 
         const currentUser = await GeminiService.getCurrentUser();
         const params = new URLSearchParams(window.location.search);
+        if (params.get('payment') === 'success') {
+          trackFunnel('checkout_success', { language, screen: AppStep.UPLOAD });
+        } else if (params.get('payment') === 'cancel') {
+          trackFunnel('checkout_cancel', { language, screen: AppStep.UPLOAD });
+        }
 
         if (!currentUser) {
           localStorage.removeItem('ps_email');
@@ -158,6 +172,7 @@ const App: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      trackFunnel('photo_selected', { language, screen: AppStep.UPLOAD });
       const reader = new FileReader();
       reader.onload = (event) => {
         setOriginalImage(event.target?.result as string);
@@ -177,6 +192,7 @@ const App: React.FC = () => {
 
     if (isAnonymousFreeGeneration) {
       if (freeCreditsLeft <= 0) {
+        trackFunnel('email_gate_opened', { language, screen: AppStep.CHOOSE_STYLE });
         setShowEmailModalForGenerate(true);
         return;
       }
@@ -194,6 +210,7 @@ const App: React.FC = () => {
       }
 
       if (currentCredits <= 0) {
+        trackFunnel('payment_opened', { language, screen: AppStep.CHOOSE_STYLE });
         setShowPaymentModal(true);
         return;
       }
@@ -207,6 +224,7 @@ const App: React.FC = () => {
       [PhotoStyle.BUSINESS_LUXE]: t.processingBusiness,
     };
 
+    trackFunnel('generation_started', { language, screen: AppStep.CHOOSE_STYLE, style });
     setProcessing({ isProcessing: true, status: statusMap[style] });
 
     try {
@@ -215,6 +233,7 @@ const App: React.FC = () => {
       const promptToSend = canUsePremiumDetails ? customPrompt : '';
       const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, promptToSend);
       setResultImage(res);
+      trackFunnel('generation_succeeded', { language, screen: AppStep.RESULT, style });
       setStep(AppStep.RESULT);
 
       if (activeEmail) {
@@ -223,6 +242,7 @@ const App: React.FC = () => {
         setFreeGenerationsUsed(prev => Math.min(FREE_TRIAL_LIMIT, prev + 1));
       }
     } catch (error: any) {
+      trackFunnel('generation_failed', { language, screen: AppStep.CHOOSE_STYLE, style, reason: classifyFunnelError(error) });
       console.error("Generation error:", error);
       if (error.message === 'OUT_OF_CREDITS') {
         setShowPaymentModal(true);
@@ -291,6 +311,7 @@ const App: React.FC = () => {
 
   const handleDownload = () => {
     if (!resultImage) return;
+    trackFunnel('result_downloaded', { language, screen: AppStep.RESULT, style: selectedStyle || undefined });
     downloadDataUrl(resultImage, 'profile-studio-ai-portrait.jpg');
   };
 
@@ -462,35 +483,51 @@ const App: React.FC = () => {
 
       case AppStep.UPLOAD:
         return (
-          <div className="max-w-2xl mx-auto py-20 px-8 bg-white/5 border border-white/10 rounded-[3rem] flex flex-col items-center gap-12 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
-            <div className="w-28 h-28 bg-gold/10 rounded-full flex items-center justify-center text-gold ring-1 ring-gold/20 relative">
-              <ICONS.Camera />
-              <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-gold rounded-full flex items-center justify-center text-black text-xs font-bold animate-bounce">+</div>
+          <section className="max-w-2xl mx-auto flex flex-col items-center animate-in fade-in zoom-in-95 duration-500">
+            <div className="text-center mb-4 sm:mb-6">
+              <p className="text-gold text-[10px] uppercase font-bold tracking-[0.28em] mb-2">{t.demoEyebrow}</p>
+              <h2 className="text-3xl sm:text-5xl font-serif text-white italic leading-tight">{t.uploadTitle}</h2>
+              <p className="text-slate-400 text-sm sm:text-base max-w-lg mx-auto mt-2 leading-relaxed">{t.uploadDesc}</p>
             </div>
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-5xl font-serif text-white italic">{t.uploadTitle}</h2>
-              <p className="text-slate-400 max-w-sm mx-auto leading-relaxed">
-                {t.uploadDesc}
-              </p>
-            </div>
+
+            <figure className="w-full max-w-md">
+              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 shadow-2xl">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-black">
+                  <img src="/demo/restoration-before.webp" alt={t.demoBefore} className="h-full w-full object-cover object-top" />
+                  <span className="absolute bottom-2 left-2 rounded-md bg-black/75 px-2.5 py-1 text-[10px] font-bold uppercase text-white">{t.demoBefore}</span>
+                </div>
+                <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-black">
+                  <img src="/demo/restoration-after.webp" alt={t.demoAfter} className="h-full w-full object-cover object-top" />
+                  <span className="absolute bottom-2 left-2 rounded-md bg-gold px-2.5 py-1 text-[10px] font-bold uppercase text-black">{t.demoAfter}</span>
+                </div>
+              </div>
+              <figcaption className="flex items-start justify-between gap-3 px-1 pt-2 text-[10px] leading-relaxed text-slate-500">
+                <span>{t.demoCaption}</span>
+                <a
+                  href="https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 underline decoration-slate-700 underline-offset-2 hover:text-white"
+                >
+                  {t.demoSource}
+                </a>
+              </figcaption>
+            </figure>
 
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="group px-16 py-6 rounded-full font-bold text-xl transition-all flex items-center gap-3 bg-gold text-black hover:bg-white transform hover:-translate-y-1 shadow-[0_20px_50px_rgba(194,163,93,0.3)] active:scale-95"
+              onClick={() => {
+                trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
+                fileInputRef.current?.click();
+              }}
+              className="group mt-4 sm:mt-6 w-full max-w-md min-h-14 rounded-2xl bg-gold px-6 py-4 text-lg font-black text-black shadow-[0_16px_40px_rgba(194,163,93,0.3)] transition-all hover:bg-white active:scale-[0.98] flex items-center justify-center gap-3"
             >
               {t.startBtn} <ICONS.Magic />
             </button>
-            <div className="w-full max-w-lg mx-auto bg-white/5 p-6 rounded-3xl border border-white/10 mt-4 text-center">
-              <h3 className="text-gold text-[10px] uppercase font-bold tracking-[0.4em] mb-4">{t.howItWorksTitle || 'How it works'}</h3>
-              <div className="text-slate-300 text-sm leading-relaxed space-y-2">
-                <p>{t.stepUpload || '1. Upload a selfie'}</p>
-                <p>{t.stepChoose || '2. Choose a portrait style'}</p>
-                <p>{t.stepGenerate || '3. Generate and download'}</p>
-              </div>
-            </div>
-          </div>
+            <p className="mt-2 text-center text-xs font-semibold text-slate-400">{t.freeNoSignup}</p>
+            <p className="mt-3 hidden sm:block text-center text-[11px] text-slate-600">{t.howItWorks}</p>
+          </section>
         );
 
       case AppStep.CHOOSE_STYLE:
@@ -551,6 +588,7 @@ const App: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setSelectedStyle(style.id);
+                        trackFunnel('style_selected', { language, screen: AppStep.CHOOSE_STYLE, style: style.id });
                         if (!premiumFeaturesEnabled) {
                           void handleGenerate(style.id);
                         }
@@ -809,7 +847,10 @@ const App: React.FC = () => {
         userEmail={userEmail}
         hasGallery={hasGallery}
         onViewHistory={() => setStep(AppStep.HISTORY)}
-        onBuyCredits={() => setShowPaymentModal(true)}
+        onBuyCredits={() => {
+          trackFunnel('payment_opened', { language, screen: step });
+          setShowPaymentModal(true);
+        }}
         onLogout={async () => {
           try {
             await GeminiService.logout();
@@ -825,7 +866,7 @@ const App: React.FC = () => {
           }
         }}
       />
-      <main className="container mx-auto px-6 pt-8 relative z-10 flex-grow">
+      <main className="container mx-auto px-4 sm:px-6 pt-2 sm:pt-8 relative z-10 flex-grow">
         {renderContent()}
       </main>
 
@@ -870,11 +911,13 @@ const App: React.FC = () => {
           language={language}
           onSelect={async (planId) => {
             if (!userEmail) {
+              trackFunnel('email_gate_opened', { language, screen: step });
               setShowPaymentModal(false);
               setShowEmailModalForGenerate(true);
               return;
             }
             try {
+              trackFunnel('checkout_started', { language, screen: step, plan: planId });
               const session = await GeminiService.createCheckoutSession(planId);
               if (session.url) window.location.href = session.url;
             } catch (e: any) {

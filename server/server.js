@@ -17,6 +17,7 @@ const {
   safeEqual,
   serializeCookie,
 } = require('./security');
+const { buildFunnelReport, normalizeAnalyticsEvent } = require('./analytics');
 
 const isProduction = (process.env.NODE_ENV || 'production') === 'production';
 const requiredProductionSettings = [
@@ -624,6 +625,32 @@ app.use((err, _req, res, next) => {
 
 app.get('/api/health', (_req, res) => res.type('text/plain').send('OK'));
 
+app.post('/api/analytics/event', optionalAuth, (req, res) => {
+  const email = req.authEmail || null;
+  let visitorHash = email ? statsIdentity(email) : '';
+
+  if (!visitorHash) {
+    const cookieToken = parseCookies(req.headers.cookie)[ANONYMOUS_COOKIE];
+    const anonymousIdentity = anonymousUsageStore.getOrIssue(cookieToken);
+    visitorHash = hashToken(anonymousIdentity.token);
+    if (anonymousIdentity.isNew) {
+      appendSetCookie(res, serializeCookie(ANONYMOUS_COOKIE, anonymousIdentity.token, {
+        maxAge: ANONYMOUS_MAX_AGE_SECONDS,
+        secure: isProduction,
+        sameSite: 'Lax',
+      }));
+    }
+  }
+
+  const event = normalizeAnalyticsEvent(req.body, {
+    visitorHash,
+    authenticated: Boolean(email),
+  });
+  if (!event) return res.status(400).json({ error: 'Invalid analytics event' });
+  appendStatsEvent('funnel_event', event);
+  return res.status(204).end();
+});
+
 app.post('/api/auth/device-session', authRateLimit, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: 'Valid email required' });
@@ -998,6 +1025,24 @@ app.get('/api/admin/daily-stats', async (req, res) => {
     res.json({ stats, text });
   } catch (err) {
     sendRouteError(res, 'Stats', err);
+  }
+});
+
+app.get('/api/admin/funnel-stats', (req, res) => {
+  if (!isAdminRequest(req)) return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const requestedDays = Number.parseInt(String(req.query.days || '30'), 10);
+    const days = Math.min(90, Math.max(1, Number.isFinite(requestedDays) ? requestedDays : 30));
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    const events = readStatsEvents(start, end);
+    const report = buildFunnelReport(events, { timeZone: STATS_TIME_ZONE });
+    res.json({
+      range: { start: start.toISOString(), end: end.toISOString(), days, timeZone: STATS_TIME_ZONE },
+      ...report,
+    });
+  } catch (err) {
+    sendRouteError(res, 'Funnel stats', err);
   }
 });
 
