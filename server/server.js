@@ -18,6 +18,7 @@ const {
   serializeCookie,
 } = require('./security');
 const { buildFunnelReport, normalizeAnalyticsEvent } = require('./analytics');
+const { inspectGeminiImageResponse, isGeminiSafetyError } = require('./gemini-response');
 
 const isProduction = (process.env.NODE_ENV || 'production') === 'production';
 const requiredProductionSettings = [
@@ -520,7 +521,7 @@ async function generateImage(parts) {
     'gemini-3.1-flash-image-preview',
     'gemini-3-pro-image-preview',
   ].filter((model, index, list) => model && list.indexOf(model) === index);
-  let lastText = '';
+  let receivedNonImageResponse = false;
   let lastError = null;
 
   for (const model of models) {
@@ -530,18 +531,31 @@ async function generateImage(parts) {
         contents: [{ role: 'user', parts }],
         config: { responseModalities: ['TEXT', 'IMAGE'] },
       });
-      const responseParts = response.candidates?.[0]?.content?.parts || [];
-      const genImg = responseParts.find(part => part.inlineData)?.inlineData?.data;
-      if (genImg) return genImg;
-      lastText = responseParts.map(part => part.text).filter(Boolean).join(' ').slice(0, 300);
+      const inspection = inspectGeminiImageResponse(response);
+      if (inspection.image) return inspection.image;
+      if (inspection.blocked) {
+        const reason = inspection.promptBlockReason || inspection.finishReason || 'UNKNOWN';
+        console.warn(`[Gemini] ${model} blocked image request (${reason})`);
+        throw new HttpError(422, 'IMAGE_RESTRICTED');
+      }
+      receivedNonImageResponse = true;
       console.error(`[Gemini] ${model} returned no image`);
     } catch (err) {
+      if (err instanceof HttpError) throw err;
+      if (isGeminiSafetyError(err)) {
+        console.warn(`[Gemini] ${model} blocked image request (API_ERROR)`);
+        throw new HttpError(422, 'IMAGE_RESTRICTED');
+      }
       lastError = err;
       console.error(`[Gemini] ${model} failed: ${err.name || 'Error'}`);
     }
   }
-  if (lastError) throw lastError;
-  throw new Error(lastText || 'Gemini did not return an image');
+  if (receivedNonImageResponse) throw new HttpError(422, 'IMAGE_NOT_GENERATED');
+  if (lastError) {
+    if (Number(lastError.status) === 429) throw new HttpError(503, 'IMAGE_SERVICE_BUSY');
+    throw lastError;
+  }
+  throw new HttpError(422, 'IMAGE_NOT_GENERATED');
 }
 
 app.disable('x-powered-by');

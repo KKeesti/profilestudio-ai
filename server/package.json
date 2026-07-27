@@ -4,7 +4,7 @@
   "description": "ShotMe.ee backend",
   "main": "server.js",
   "scripts": {
-    "test": "node --test security.test.js analytics.test.js"
+    "test": "node --test security.test.js analytics.test.js gemini-response.test.js"
   },
   "keywords": [],
   "author": "",

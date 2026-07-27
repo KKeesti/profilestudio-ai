@@ -68,6 +68,7 @@ const App: React.FC = () => {
   });
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancel' | null>(null);
   const [showAnimatePaywall, setShowAnimatePaywall] = useState(false);
+  const [generationError, setGenerationError] = useState<'restricted' | 'unavailable' | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -248,7 +249,7 @@ const App: React.FC = () => {
       if (error.message === 'OUT_OF_CREDITS') {
         setShowPaymentModal(true);
       } else {
-        alert("Generation error: " + error.message);
+        setGenerationError(error.message === 'IMAGE_RESTRICTED' ? 'restricted' : 'unavailable');
       }
     } finally {
       setProcessing({ isProcessing: false, status: '' });
@@ -976,6 +977,46 @@ const App: React.FC = () => {
             }
           }}
         />
+      )}
+
+      {generationError && (
+        <div
+          className="fixed inset-0 z-[330] flex items-center justify-center bg-black/85 backdrop-blur-md px-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="generation-error-title"
+          onClick={() => setGenerationError(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111417] p-7 text-center shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div
+              className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-gold/50 bg-gold/10 text-xl font-black text-gold"
+              aria-hidden="true"
+            >
+              !
+            </div>
+            <h2 id="generation-error-title" className="mb-3 font-serif text-2xl italic text-white">
+              {TRANSLATIONS[language].generationErrorTitle}
+            </h2>
+            <p className="mb-3 leading-relaxed text-slate-300">
+              {generationError === 'restricted'
+                ? TRANSLATIONS[language].imageRestrictedMessage
+                : TRANSLATIONS[language].generationUnavailableMessage}
+            </p>
+            <p className="mb-6 text-sm font-semibold text-gold">
+              {TRANSLATIONS[language].generationAttemptNotCharged}
+            </p>
+            <button
+              type="button"
+              onClick={() => setGenerationError(null)}
+              className="min-h-12 w-full rounded-xl bg-gold px-5 py-3 font-black text-black transition-colors hover:bg-white"
+            >
+              {TRANSLATIONS[language].understood}
+            </button>
+          </div>
+        </div>
       )}
 
       {showAnimatePaywall && (

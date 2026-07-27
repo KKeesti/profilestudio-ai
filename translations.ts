@@ -87,6 +87,10 @@ export const TRANSLATIONS = {
     historyEmpty: "You don't have any generated portraits yet.",
     animatePhoto: "Animate Photo",
     animatePremiumOnly: "This option is available only in the paid version.",
+    generationErrorTitle: "This photo could not be processed",
+    imageRestrictedMessage: "Google may restrict images of well-known people or other content covered by its safety rules. Please try a different photo.",
+    generationUnavailableMessage: "The image service did not return a result. Please try again or choose a different photo.",
+    generationAttemptNotCharged: "This attempt was not deducted.",
     understood: "Understood"
   },
   [Language.ET]: {
@@ -171,6 +175,10 @@ export const TRANSLATIONS = {
     historyEmpty: "Sul ei ole veel ühtegi loodud portreed.",
     animatePhoto: "Elusta foto",
     animatePremiumOnly: "See võimalus on saadaval ainult tasulises versioonis.",
+    generationErrorTitle: "Fotot ei saanud töödelda",
+    imageRestrictedMessage: "Google võib piirata tuntud inimeste pilte või muud ohutusreeglitega kaitstud sisu. Proovi teist fotot.",
+    generationUnavailableMessage: "Pilditeenus ei tagastanud tulemust. Proovi uuesti või vali teine foto.",
+    generationAttemptNotCharged: "Seda katset ei arvestatud maha.",
     understood: "Sain aru"
   },
   [Language.RU]: {
@@ -255,6 +263,10 @@ export const TRANSLATIONS = {
     historyEmpty: "У вас пока нет созданных портретов.",
     animatePhoto: "Оживить фото",
     animatePremiumOnly: "Данная опция доступна только в платной версии.",
+    generationErrorTitle: "Не удалось обработать фото",
+    imageRestrictedMessage: "Google может ограничивать обработку фотографий известных людей и другого контента, защищённого правилами безопасности. Попробуйте другую фотографию.",
+    generationUnavailableMessage: "Сервис обработки изображений не вернул результат. Попробуйте ещё раз или выберите другую фотографию.",
+    generationAttemptNotCharged: "Эта попытка не была списана.",
     understood: "Понятно"
   },
   [Language.LV]: {
@@ -339,6 +351,10 @@ export const TRANSLATIONS = {
     historyEmpty: "Jums vēl nav izveidotu portretu.",
     animatePhoto: "Atdzīvināt foto",
     animatePremiumOnly: "Šī iespēja ir pieejama tikai maksas versijā.",
+    generationErrorTitle: "Fotoattēlu neizdevās apstrādāt",
+    imageRestrictedMessage: "Google var ierobežot pazīstamu cilvēku attēlus vai citu saturu, uz kuru attiecas drošības noteikumi. Izmēģiniet citu fotoattēlu.",
+    generationUnavailableMessage: "Attēlu pakalpojums neatgrieza rezultātu. Mēģiniet vēlreiz vai izvēlieties citu fotoattēlu.",
+    generationAttemptNotCharged: "Šis mēģinājums netika atskaitīts.",
     understood: "Sapratu"
   },
   [Language.LT]: {
@@ -423,6 +439,10 @@ export const TRANSLATIONS = {
     historyEmpty: "Dar neturite sukurtų portretų.",
     animatePhoto: "Atgaivinti nuotrauką",
     animatePremiumOnly: "Ši funkcija prieinama tik mokamoje versijoje.",
+    generationErrorTitle: "Nepavyko apdoroti nuotraukos",
+    imageRestrictedMessage: "Google gali riboti žinomų žmonių nuotraukas ar kitą turinį, kuriam taikomos saugos taisyklės. Išbandykite kitą nuotrauką.",
+    generationUnavailableMessage: "Vaizdų paslauga nepateikė rezultato. Bandykite dar kartą arba pasirinkite kitą nuotrauką.",
+    generationAttemptNotCharged: "Šis bandymas nebuvo nuskaičiuotas.",
     understood: "Supratau"
   },
   [Language.FI]: {
@@ -507,6 +527,10 @@ export const TRANSLATIONS = {
     historyEmpty: "Sinulla ei ole vielä luotuja muotokuvia.",
     animatePhoto: "Elävöitä kuva",
     animatePremiumOnly: "Tämä toiminto on saatavilla vain maksullisessa versiossa.",
+    generationErrorTitle: "Kuvaa ei voitu käsitellä",
+    imageRestrictedMessage: "Google voi rajoittaa tunnettujen henkilöiden kuvia tai muuta turvallisuussääntöjen alaista sisältöä. Kokeile toista kuvaa.",
+    generationUnavailableMessage: "Kuvapalvelu ei palauttanut tulosta. Yritä uudelleen tai valitse toinen kuva.",
+    generationAttemptNotCharged: "Tätä yritystä ei vähennetty.",
     understood: "Ymmärsin"
   }
 };
