@@ -172,15 +172,19 @@ const App: React.FC = () => {
   }, [freeGenerationsUsed]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (file) {
-      trackFunnel('photo_selected', { language, screen: AppStep.UPLOAD });
+      trackFunnel('photo_selected', { language, screen: step });
       const reader = new FileReader();
       reader.onload = (event) => {
         setOriginalImage(event.target?.result as string);
+        setResultImage(null);
+        setShowOriginal(false);
         setStep(AppStep.CHOOSE_STYLE);
       };
       reader.readAsDataURL(file);
+      input.value = '';
     }
   };
 
@@ -525,7 +529,6 @@ const App: React.FC = () => {
               </figcaption>
             </figure>
 
-            <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
             <button
               type="button"
               onClick={() => {
@@ -544,15 +547,35 @@ const App: React.FC = () => {
       case AppStep.CHOOSE_STYLE:
         return (
           <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-16 items-start animate-in slide-in-from-bottom-8 duration-700">
-            <div className="relative rounded-[3rem] overflow-hidden border border-white/10 sticky top-10 shadow-2xl bg-black group hidden lg:block">
-              {originalImage && <img src={originalImage} alt="Original" className="w-full h-auto opacity-70 group-hover:opacity-100 transition-opacity duration-1000" />}
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
-              <div className="absolute bottom-8 left-8">
-                <span className="text-[10px] text-gold font-bold uppercase tracking-[0.3em] bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-gold/20">{t.originalPhoto}</span>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label={t.replacePhoto}
+              className="group relative sticky top-10 hidden w-full cursor-pointer overflow-hidden rounded-[3rem] border border-white/10 bg-black text-left shadow-2xl transition-colors hover:border-gold/60 focus:outline-none focus:ring-2 focus:ring-gold lg:block"
+            >
+              {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-auto w-full opacity-75 transition-opacity duration-500 group-hover:opacity-100 group-focus:opacity-100" />}
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+              <div className="pointer-events-none absolute inset-x-6 bottom-6 flex items-center justify-between gap-3">
+                <span className="rounded-full border border-gold/20 bg-black/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.3em] text-gold backdrop-blur-md">{t.originalPhoto}</span>
+                <span className="flex min-h-11 items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-black text-black shadow-lg">
+                  <ICONS.Camera /> {t.replacePhoto}
+                </span>
               </div>
-            </div>
+            </button>
 
             <div className="space-y-10 pb-20">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label={t.replacePhoto}
+                className="group relative h-52 w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-xl focus:outline-none focus:ring-2 focus:ring-gold sm:h-64 lg:hidden"
+              >
+                {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-full w-full object-contain" />}
+                <span className="pointer-events-none absolute inset-x-3 bottom-3 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-gold px-4 py-3 text-sm font-black text-black shadow-lg">
+                  <ICONS.Camera /> {t.replacePhoto}
+                </span>
+              </button>
+
               <div className="space-y-4">
                 <h2 className="text-4xl md:text-5xl font-serif text-white italic">2. {t.chooseStyle}</h2>
                 <div className="flex items-center gap-4">
@@ -888,6 +911,13 @@ const App: React.FC = () => {
             localStorage.removeItem('ps_credits');
           }
         }}
+      />
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        ref={fileInputRef}
+        onChange={handleImageUpload}
       />
       <main className="container mx-auto px-4 sm:px-6 pt-2 sm:pt-8 relative z-10 flex-grow">
         {renderContent()}
