@@ -84,7 +84,10 @@ export const TRANSLATIONS = {
     stepGenerate: "3. Generate and download",
     enterEmailToSave: "Your 10 free attempts are over. Enter your email to continue and choose a package.",
     saveResult: "Continue",
-    historyEmpty: "You don't have any generated portraits yet."
+    historyEmpty: "You don't have any generated portraits yet.",
+    animatePhoto: "Animate Photo",
+    animatePremiumOnly: "This option is available only in the paid version.",
+    understood: "Understood"
   },
   [Language.ET]: {
     ...common,
@@ -165,7 +168,10 @@ export const TRANSLATIONS = {
     stepGenerate: "3. Genereeri ja laadi alla",
     enterEmailToSave: "10 tasuta katset on läbi. Sisesta e-post, et jätkata ja valida pakett.",
     saveResult: "Jätka",
-    historyEmpty: "Sul ei ole veel ühtegi loodud portreed."
+    historyEmpty: "Sul ei ole veel ühtegi loodud portreed.",
+    animatePhoto: "Elusta foto",
+    animatePremiumOnly: "See võimalus on saadaval ainult tasulises versioonis.",
+    understood: "Sain aru"
   },
   [Language.RU]: {
     ...common,
@@ -246,7 +252,10 @@ export const TRANSLATIONS = {
     stepGenerate: "3. Сгенерируйте и скачайте",
     enterEmailToSave: "10 бесплатных попыток закончились. Введите email, чтобы продолжить и выбрать пакет.",
     saveResult: "Продолжить",
-    historyEmpty: "У вас пока нет созданных портретов."
+    historyEmpty: "У вас пока нет созданных портретов.",
+    animatePhoto: "Оживить фото",
+    animatePremiumOnly: "Данная опция доступна только в платной версии.",
+    understood: "Понятно"
   },
   [Language.LV]: {
     ...common,
@@ -327,7 +336,10 @@ export const TRANSLATIONS = {
     stepGenerate: "3. Ģenerējiet un lejupielādējiet",
     enterEmailToSave: "10 bezmaksas mēģinājumi ir beigušies. Ievadiet e-pastu, lai turpinātu un izvēlētos paketi.",
     saveResult: "Turpināt",
-    historyEmpty: "Jums vēl nav izveidotu portretu."
+    historyEmpty: "Jums vēl nav izveidotu portretu.",
+    animatePhoto: "Atdzīvināt foto",
+    animatePremiumOnly: "Šī iespēja ir pieejama tikai maksas versijā.",
+    understood: "Sapratu"
   },
   [Language.LT]: {
     ...common,
@@ -408,7 +420,10 @@ export const TRANSLATIONS = {
     stepGenerate: "3. Sugeneruokite ir atsisiųskite",
     enterEmailToSave: "10 nemokamų bandymų baigėsi. Įveskite el. paštą, kad tęstumėte ir pasirinktumėte paketą.",
     saveResult: "Tęsti",
-    historyEmpty: "Dar neturite sukurtų portretų."
+    historyEmpty: "Dar neturite sukurtų portretų.",
+    animatePhoto: "Atgaivinti nuotrauką",
+    animatePremiumOnly: "Ši funkcija prieinama tik mokamoje versijoje.",
+    understood: "Supratau"
   },
   [Language.FI]: {
     ...common,
@@ -489,6 +504,9 @@ export const TRANSLATIONS = {
     stepGenerate: "3. Luo ja lataa",
     enterEmailToSave: "10 ilmaista kokeilua on käytetty. Syötä sähköposti jatkaaksesi ja valitaksesi paketin.",
     saveResult: "Jatka",
-    historyEmpty: "Sinulla ei ole vielä luotuja muotokuvia."
+    historyEmpty: "Sinulla ei ole vielä luotuja muotokuvia.",
+    animatePhoto: "Elävöitä kuva",
+    animatePremiumOnly: "Tämä toiminto on saatavilla vain maksullisessa versiossa.",
+    understood: "Ymmärsin"
   }
 };

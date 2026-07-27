@@ -10,6 +10,7 @@ export type FunnelEvent =
   | 'generation_succeeded'
   | 'generation_failed'
   | 'result_downloaded'
+  | 'animate_photo_clicked'
   | 'email_gate_opened'
   | 'payment_opened'
   | 'checkout_started'

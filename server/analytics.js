@@ -8,6 +8,7 @@ const ALLOWED_EVENTS = new Set([
   'generation_succeeded',
   'generation_failed',
   'result_downloaded',
+  'animate_photo_clicked',
   'email_gate_opened',
   'payment_opened',
   'checkout_started',
@@ -138,6 +139,12 @@ function buildFunnelReport(allEvents, options = {}) {
     uniqueVisitors: uniqueVisitors.size,
     totalEvents: events.length,
     funnel,
+    featureInterest: {
+      animatePhotoClicks: events.filter(event => event.name === 'animate_photo_clicked').length,
+      uniqueVisitors: new Set(
+        events.filter(event => event.name === 'animate_photo_clicked').map(event => event.visitorHash).filter(Boolean),
+      ).size,
+    },
     failures: countBy(events.filter(event => event.name === 'generation_failed'), 'reason'),
     languages: countBy(events.filter(event => event.name === 'page_view'), 'language'),
     devices: countBy(events.filter(event => event.name === 'page_view'), 'device'),

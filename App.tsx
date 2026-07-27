@@ -67,6 +67,7 @@ const App: React.FC = () => {
     status: '',
   });
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancel' | null>(null);
+  const [showAnimatePaywall, setShowAnimatePaywall] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -313,6 +314,15 @@ const App: React.FC = () => {
     if (!resultImage) return;
     trackFunnel('result_downloaded', { language, screen: AppStep.RESULT, style: selectedStyle || undefined });
     downloadDataUrl(resultImage, 'profile-studio-ai-portrait.jpg');
+  };
+
+  const handleAnimatePhotoClick = () => {
+    trackFunnel('animate_photo_clicked', {
+      language,
+      screen: AppStep.RESULT,
+      style: selectedStyle || undefined,
+    });
+    setShowAnimatePaywall(true);
   };
 
   const addTag = (tag: string) => {
@@ -757,6 +767,18 @@ const App: React.FC = () => {
                   <ICONS.Rotate /> {t.backToUpload}
                 </button>
               </div>
+
+              {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO && !premiumFeaturesEnabled && (
+                <button
+                  type="button"
+                  onClick={handleAnimatePhotoClick}
+                  className="w-full max-w-md min-h-14 border border-gold/50 bg-gold/10 text-gold rounded-2xl px-6 py-4 font-black text-base flex items-center justify-center gap-3 hover:bg-gold hover:text-black transition-all active:scale-[0.98]"
+                >
+                  <span aria-hidden="true" className="text-lg">▶</span>
+                  {t.animatePhoto}
+                  <span className="rounded-md border border-current px-2 py-0.5 text-[9px] uppercase tracking-widest">PRO</span>
+                </button>
+              )}
             </div>
 
             <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-600 hover:text-gold text-[10px] uppercase tracking-[0.5em] font-bold pb-10 transition-colors">NEW SESSION</button>
@@ -954,6 +976,32 @@ const App: React.FC = () => {
             }
           }}
         />
+      )}
+
+      {showAnimatePaywall && (
+        <div
+          className="fixed inset-0 z-[320] flex items-center justify-center bg-black/85 backdrop-blur-md px-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="animate-paywall-title"
+          onClick={() => setShowAnimatePaywall(false)}
+        >
+          <div
+            className="w-full max-w-sm border border-white/10 bg-[#111417] p-7 text-center shadow-2xl rounded-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="text-5xl mb-4" aria-hidden="true">😔</div>
+            <h2 id="animate-paywall-title" className="font-serif text-2xl text-white italic mb-3">{TRANSLATIONS[language].animatePhoto}</h2>
+            <p className="text-slate-300 leading-relaxed mb-6">{TRANSLATIONS[language].animatePremiumOnly}</p>
+            <button
+              type="button"
+              onClick={() => setShowAnimatePaywall(false)}
+              className="w-full min-h-12 rounded-xl bg-gold px-5 py-3 font-black text-black hover:bg-white transition-colors"
+            >
+              {TRANSLATIONS[language].understood}
+            </button>
+          </div>
+        </div>
       )}
 
       {paymentStatus && (
