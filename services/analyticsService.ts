@@ -42,6 +42,21 @@ function getDevice() {
   return 'desktop';
 }
 
+function getAnalyticsVisitorId() {
+  const key = 'shotme_analytics_visitor';
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const visitorId = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(key, visitorId);
+    return visitorId;
+  } catch {
+    return undefined;
+  }
+}
+
 function getAttribution() {
   const key = 'shotme_attribution';
   try {
@@ -75,6 +90,7 @@ export function trackFunnel(event: FunnelEvent, properties: FunnelProperties = {
   if (typeof window === 'undefined') return;
   const payload = JSON.stringify({
     event,
+    visitorId: getAnalyticsVisitorId(),
     language: properties.language,
     screen: properties.screen ? STEP_NAMES[properties.screen] : undefined,
     style: properties.style,

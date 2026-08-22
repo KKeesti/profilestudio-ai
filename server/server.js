@@ -641,7 +641,12 @@ app.get('/api/health', (_req, res) => res.type('text/plain').send('OK'));
 
 app.post('/api/analytics/event', optionalAuth, (req, res) => {
   const email = req.authEmail || null;
-  let visitorHash = email ? statsIdentity(email) : '';
+  const clientVisitorId = typeof req.body?.visitorId === 'string' && /^[a-zA-Z0-9-]{16,80}$/.test(req.body.visitorId)
+    ? req.body.visitorId
+    : '';
+  let visitorHash = email
+    ? statsIdentity(email)
+    : (clientVisitorId ? hashToken(`analytics:${clientVisitorId}`) : '');
 
   if (!visitorHash) {
     const cookieToken = parseCookies(req.headers.cookie)[ANONYMOUS_COOKIE];
