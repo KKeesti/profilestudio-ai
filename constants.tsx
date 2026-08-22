@@ -2,9 +2,9 @@
 import React from 'react';
 
 export const COLORS = {
-  gold: '#c2a35d',
-  dark: '#05070a',
-  surface: '#0d1117'
+  gold: '#f06449',
+  dark: '#15302b',
+  surface: '#ffffff'
 };
 
 export const ICONS = {

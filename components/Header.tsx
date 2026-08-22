@@ -4,6 +4,7 @@ import { TRANSLATIONS } from '../translations';
 
 interface HeaderProps {
   language: Language;
+  onLanguageChange?: (language: Language) => void;
   mode?: 'studio' | 'restore';
   credits?: number;
   hasGallery?: boolean;
@@ -24,6 +25,7 @@ const SIGN_OUT: Record<Language, string> = {
 
 const Header: React.FC<HeaderProps> = ({
   language,
+  onLanguageChange,
   mode = 'studio',
   credits = 0,
   hasGallery = false,
@@ -33,77 +35,95 @@ const Header: React.FC<HeaderProps> = ({
   userEmail,
 }) => {
   const t = TRANSLATIONS[language];
+  const languageOptions = [
+    { value: Language.EN, label: 'EN' },
+    { value: Language.ET, label: 'ET' },
+    { value: Language.RU, label: 'RU' },
+    { value: Language.LV, label: 'LV' },
+    { value: Language.LT, label: 'LT' },
+    { value: Language.FI, label: 'FI' },
+  ];
 
   return (
-    <header className="relative py-6 sm:py-12 text-center">
-      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
+    <header className="sticky top-0 z-40 border-b border-lab-line bg-lab-white font-lab text-lab-ink">
+      <div className="mx-auto flex min-h-16 w-full max-w-[1200px] items-center gap-3 px-4 sm:px-6">
+        <a href={mode === 'restore' ? '/restore' : '/'} className="shrink-0 text-xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-2xl">
+          ShotMe<span className="text-lab-coral">.ee</span>
+        </a>
 
-      <div className="flex justify-between items-center gap-3 px-4 md:px-12 pt-4 absolute top-0 w-full">
-        <div className="flex gap-2 items-center min-w-0">
+        <nav className="ml-2 hidden items-center gap-1 border-l border-lab-line pl-3 md:flex" aria-label="Photo modes">
+          <a
+            href="/restore"
+            aria-current={mode === 'restore' ? 'page' : undefined}
+            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${mode === 'restore' ? 'bg-lab-teal text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
+          >
+            {t.restoreOldPhoto}
+          </a>
+          <a
+            href="/"
+            aria-current={mode === 'studio' ? 'page' : undefined}
+            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${mode === 'studio' ? 'bg-lab-blue text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
+          >
+            {t.uploadTitle}
+          </a>
+        </nav>
+
+        <div className="ml-auto flex min-w-0 items-center gap-2">
           {userEmail && hasGallery && onViewHistory && (
             <button
               type="button"
               onClick={onViewHistory}
-              className="flex items-center gap-2 text-[10px] text-gold hover:text-white transition-colors uppercase tracking-widest font-bold bg-gold/10 border border-gold/20 px-3 sm:px-4 py-2 rounded-full hover:bg-gold/20 whitespace-nowrap"
+              className="hidden rounded-md px-3 py-2 text-sm font-semibold text-lab-teal hover:bg-lab-mist sm:block"
             >
               {t.historyTitle || 'My Gallery'}
             </button>
           )}
+
+          <span className="whitespace-nowrap rounded-full bg-lab-mist px-3 py-2 text-xs font-bold tabular-nums text-lab-ink">
+            <span className="hidden sm:inline">{userEmail ? t.creditsLeft : (t.freeCredits || t.creditsLeft)}: </span>{credits}
+          </span>
+
+          {userEmail && onBuyCredits && (
+            <button
+              type="button"
+              onClick={onBuyCredits}
+              className="rounded-md bg-lab-coral px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-lab-ink sm:text-sm"
+            >
+              {t.buyCredits}
+            </button>
+          )}
+
+          {onLanguageChange && (
+            <label className="relative">
+              <span className="sr-only">{t.selectLanguage}</span>
+              <select
+                value={language}
+                onChange={(event) => onLanguageChange(event.target.value as Language)}
+                className="h-9 cursor-pointer rounded-md border border-lab-line bg-white px-2 text-xs font-bold text-lab-ink"
+                aria-label={t.selectLanguage}
+              >
+                {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+          )}
+
           {userEmail && onLogout && (
             <button
               type="button"
               onClick={onLogout}
               title={userEmail}
-              className="text-[10px] text-slate-500 hover:text-white uppercase tracking-widest font-bold px-2 py-2 whitespace-nowrap"
+              className="hidden rounded-md px-2 py-2 text-xs font-semibold text-lab-ink/65 hover:bg-lab-mist lg:block"
             >
               {SIGN_OUT[language] || SIGN_OUT[Language.EN]}
             </button>
           )}
         </div>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 sm:px-4 py-2 whitespace-nowrap">
-            <span className="text-[10px] text-white uppercase tracking-widest font-bold">
-              {userEmail ? t.creditsLeft : (t.freeCredits || t.creditsLeft)}: <span className="text-gold">{credits}</span>
-            </span>
-          </div>
-          {userEmail && onBuyCredits && (
-            <button
-              type="button"
-              onClick={onBuyCredits}
-              className="bg-gold text-black text-[10px] uppercase font-bold tracking-widest px-3 sm:px-5 py-2 rounded-full hover:bg-white transition-all active:scale-95 whitespace-nowrap"
-            >
-              {t.buyCredits}
-            </button>
-          )}
-        </div>
       </div>
 
-      {mode === 'restore' ? (
-        <>
-          <h1 className="mt-14 sm:mt-12 text-3xl sm:text-4xl font-serif text-white mb-1">
-            ShotMe<span className="text-gold">.ee</span>
-          </h1>
-          <p className="hidden sm:block text-slate-400 text-sm mb-4 max-w-md mx-auto leading-relaxed">
-            {t.restoreHeaderTagline}
-          </p>
-        </>
-      ) : (
-        <>
-          <div className="hidden sm:inline-block mt-12 mb-4">
-            <span className="text-[10px] text-gold uppercase tracking-[0.5em] font-bold border-x border-gold/30 px-6 py-1">
-              {t.exclusiveAccess}
-            </span>
-          </div>
-
-          <h1 className="mt-12 sm:mt-0 text-4xl sm:text-5xl md:text-7xl font-serif text-white mb-2 sm:mb-4">
-            Profile <span className="text-gold italic font-light">Studio</span>
-          </h1>
-          <p className="hidden sm:block text-slate-500 font-light text-[11px] tracking-[0.25em] uppercase mb-6 max-w-md mx-auto leading-relaxed">
-            {t.highEndPhotography}
-          </p>
-        </>
-      )}
+      <nav className="flex border-t border-lab-line px-4 py-2 md:hidden" aria-label="Photo modes mobile">
+        <a href="/restore" className={`flex-1 rounded-md px-2 py-2 text-center text-xs font-bold ${mode === 'restore' ? 'bg-lab-teal text-white' : 'text-lab-ink'}`}>{t.restoreOldPhoto}</a>
+        <a href="/" className={`flex-1 rounded-md px-2 py-2 text-center text-xs font-bold ${mode === 'studio' ? 'bg-lab-blue text-white' : 'text-lab-ink'}`}>{t.uploadTitle}</a>
+      </nav>
     </header>
   );
 };

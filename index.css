@@ -3,18 +3,85 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom styles previously in index.html or global */
+/* ShotMe photo-lab visual system */
+:root {
+  font-family: 'Onest', Arial, sans-serif;
+  color: #15302b;
+  background: #f4f7f5;
+  font-synthesis: none;
+}
+
+html {
+  background: #f4f7f5;
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  background-color: #05070a;
-  color: #e2e8f0;
+  min-width: 320px;
+  background-color: #f4f7f5;
+  color: #15302b;
   overflow-x: hidden;
 }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0a0f1d; }
-::-webkit-scrollbar-thumb { background: #c2a35d; border-radius: 10px; }
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid #f06449;
+  outline-offset: 3px;
+}
+
+::selection {
+  background: #f06449;
+  color: #ffffff;
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #e8efec; }
+::-webkit-scrollbar-thumb { background: #08786f; border-radius: 8px; }
 
 .magic-glow {
-  box-shadow: 0 0 40px rgba(194, 163, 93, 0.15);
+  box-shadow: 0 18px 48px rgba(21, 48, 43, 0.18);
+}
+
+@keyframes lab-progress {
+  from { transform: scaleX(0.08); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes photo-arrive {
+  from { opacity: 0.72; transform: translateY(12px) rotate(-0.5deg); }
+  to { opacity: 1; transform: translateY(0) rotate(0deg); }
+}
+
+.photo-arrive {
+  animation: photo-arrive 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

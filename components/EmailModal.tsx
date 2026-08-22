@@ -97,26 +97,26 @@ const EmailModal: React.FC<EmailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300">
-      <div className="w-full max-w-md bg-[#0c0c0c] border border-white/10 rounded-[2rem] p-8 sm:p-10 space-y-7 shadow-[0_0_80px_rgba(194,163,93,0.15)] relative">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-lab-ink/75 p-4 font-lab animate-in fade-in duration-300 sm:p-6">
+      <div className="relative w-full max-w-md space-y-6 rounded-lg border border-lab-line bg-white p-6 shadow-[0_24px_70px_rgba(21,48,43,0.25)] sm:p-8">
         {cancellable && (
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-5 right-5 text-slate-500 hover:text-white transition-colors text-2xl"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-md text-2xl font-bold text-lab-ink/50 transition-colors hover:bg-lab-mist hover:text-lab-ink"
             aria-label="Close"
           >
             x
           </button>
         )}
 
-        <div className="text-center space-y-3">
-          <h2 className="text-3xl font-serif text-white italic">{t.saveResult || 'Secure access'}</h2>
-          <p className="text-slate-400 text-sm leading-relaxed">{t.enterEmailToSave}</p>
+        <div className="pr-8 text-left">
+          <h2 className="text-2xl font-extrabold tracking-[-0.02em] text-lab-ink sm:text-3xl">{t.saveResult || 'Secure access'}</h2>
+          <p className="mt-3 text-sm leading-6 text-lab-ink/65">{t.enterEmailToSave}</p>
         </div>
 
         {success ? (
-          <div className="rounded-2xl border border-gold/30 bg-gold/10 p-5 text-center text-sm leading-6 text-white">
+          <div className="rounded-md border border-lab-teal bg-[#e7f5f2] p-5 text-center text-sm leading-6 text-lab-ink">
             {success || authText.sent}
           </div>
         ) : (
@@ -127,32 +127,32 @@ const EmailModal: React.FC<EmailModalProps> = ({
               onChange={(event) => { setEmail(event.target.value); setError(''); }}
               placeholder="your@email.com"
               autoComplete="email"
-              className="w-full bg-white/5 border border-white/10 focus:border-gold rounded-2xl px-6 py-4 text-white outline-none transition-all placeholder:text-slate-600 text-center text-lg"
+              className="w-full rounded-md border border-lab-line bg-lab-paper px-5 py-4 text-lg text-lab-ink outline-none transition-colors placeholder:text-lab-ink/35 focus:border-lab-teal"
               autoFocus
             />
-            <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left cursor-pointer">
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-lab-line bg-lab-paper p-4 text-left">
               <input
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(event) => { setAcceptedTerms(event.target.checked); setError(''); }}
-                className="mt-1 h-5 w-5 shrink-0 rounded border-white/30 bg-black/70 accent-[#c2a35d]"
+                className="mt-1 h-5 w-5 shrink-0 accent-[#08786f]"
               />
-              <span className="text-xs leading-5 text-slate-400">
+              <span className="text-xs leading-5 text-lab-ink/65">
                 {t.consentText}{' '}
-                <a href="/terms.html" target="_blank" rel="noreferrer" className="text-gold hover:underline">Terms of Use</a>
+                <a href="/terms.html" target="_blank" rel="noreferrer" className="font-semibold text-lab-teal hover:underline">Terms of Use</a>
                 {' / '}
-                <a href="/privacy-policy.html" target="_blank" rel="noreferrer" className="text-gold hover:underline">{t.privacyPolicyLink}</a>.
+                <a href="/privacy-policy.html" target="_blank" rel="noreferrer" className="font-semibold text-lab-teal hover:underline">{t.privacyPolicyLink}</a>.
               </span>
             </label>
-            {error && <p className="text-red-400 text-xs text-center" role="alert">{error}</p>}
+            {error && <p className="text-center text-xs font-semibold text-red-600" role="alert">{error}</p>}
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-5 bg-gold text-black rounded-2xl font-black text-base hover:bg-white transition-all active:scale-95 disabled:opacity-60 disabled:cursor-wait"
+              className="min-h-14 w-full rounded-md bg-lab-coral px-5 py-4 text-base font-extrabold text-white transition-colors hover:bg-lab-ink disabled:cursor-wait disabled:opacity-60"
             >
               {submitting ? authText.sending : authText.submit}
             </button>
-            <p className="text-slate-500 text-[10px] text-center uppercase tracking-widest mt-4">{t.emailReason}</p>
+            <p className="mt-4 text-center text-xs leading-5 text-lab-ink/55">{t.emailReason}</p>
           </form>
         )}
       </div>

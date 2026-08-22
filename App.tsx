@@ -78,6 +78,7 @@ const App: React.FC = () => {
   const [generationError, setGenerationError] = useState<'restricted' | 'unavailable' | null>(null);
   const [restoreDemoAfter, setRestoreDemoAfter] = useState(true);
   const [isUploadDragging, setIsUploadDragging] = useState(false);
+  const [pendingUploadStyle, setPendingUploadStyle] = useState<PhotoStyle | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -139,6 +140,10 @@ const App: React.FC = () => {
   useEffect(() => {
     trackFunnel('screen_view', { language, screen: step });
   }, [language, step]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [step]);
 
   useEffect(() => {
     let cancelled = false;
@@ -306,13 +311,17 @@ const App: React.FC = () => {
       setResultImage(null);
       setShowOriginal(false);
 
-      if (isRestoreMode) {
-        setSelectedStyle(PhotoStyle.RESTORE_OLD_PHOTO);
-        trackFunnel('style_selected', { language, screen: AppStep.UPLOAD, style: PhotoStyle.RESTORE_OLD_PHOTO });
-        void handleGenerate(PhotoStyle.RESTORE_OLD_PHOTO, imageData);
+      const immediateStyle = isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : pendingUploadStyle;
+      if (immediateStyle && !premiumFeaturesEnabled) {
+        setSelectedStyle(immediateStyle);
+        setPendingUploadStyle(null);
+        trackFunnel('style_selected', { language, screen: AppStep.UPLOAD, style: immediateStyle });
+        void handleGenerate(immediateStyle, imageData);
         return;
       }
 
+      if (immediateStyle) setSelectedStyle(immediateStyle);
+      setPendingUploadStyle(null);
       setStep(AppStep.CHOOSE_STYLE);
     };
     reader.readAsDataURL(file);
@@ -569,72 +578,63 @@ const App: React.FC = () => {
         );
 
       case AppStep.UPLOAD:
-        if (isRestoreMode) {
-          return (
-            <section className="mx-auto flex w-full max-w-3xl flex-col items-center animate-in fade-in duration-500">
-              <div className="max-w-2xl text-center">
-                <h2 className="text-balance font-serif text-4xl leading-[1.08] text-white sm:text-5xl lg:text-6xl">
-                  {t.restoreLandingTitle}
-                </h2>
-                <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-                  {t.restoreLandingDesc}
-                </p>
-              </div>
+        return (
+          <div className="mx-auto w-full max-w-[1200px] animate-in fade-in duration-500">
+            <section className="overflow-hidden rounded-lg bg-lab-ink text-white">
+              <div className="grid lg:min-h-[620px] lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="order-2 flex flex-col justify-center px-4 py-4 min-[360px]:px-6 min-[360px]:py-8 sm:px-10 lg:order-none lg:px-14 lg:py-16">
+                  <h1 className="max-w-xl text-[28px] font-extrabold leading-[1.04] tracking-[-0.03em] min-[360px]:text-4xl sm:text-5xl lg:text-6xl">
+                    {isRestoreMode ? t.restoreLandingTitle : (t.homeHeroTitle || t.uploadTitle)}
+                  </h1>
+                  <p className="mt-3 max-w-xl text-[15px] leading-6 text-[#d8ece6] max-[359px]:hidden min-[360px]:mt-5 min-[360px]:text-base min-[360px]:leading-7 sm:text-lg">
+                    {isRestoreMode ? t.restoreLandingDesc : (t.homeHeroDesc || t.uploadDesc)}
+                  </p>
 
-              <button
-                ref={uploadCtaRef}
-                type="button"
-                onClick={() => {
-                  trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
-                  fileInputRef.current?.click();
-                }}
-                onDragEnter={(event) => {
-                  event.preventDefault();
-                  setIsUploadDragging(true);
-                }}
-                onDragOver={(event) => event.preventDefault()}
-                onDragLeave={() => setIsUploadDragging(false)}
-                onDrop={handleImageDrop}
-                className={`mt-7 flex min-h-20 w-full max-w-xl flex-col items-center justify-center gap-1 rounded-2xl border px-6 py-4 text-black shadow-[0_18px_44px_rgba(194,163,93,0.28)] transition-all focus:outline-none focus:ring-4 focus:ring-gold/30 active:scale-[0.99] ${isUploadDragging ? 'border-white bg-white' : 'border-gold bg-gold hover:border-white hover:bg-white'}`}
-              >
-                <span className="flex items-center justify-center gap-3 text-base font-black sm:text-lg">
-                  <ICONS.Camera /> {t.restoreLandingCta}
-                </span>
-                <span className="hidden text-xs font-semibold text-black/60 sm:block">{t.restoreDropHint}</span>
-              </button>
-              <p className="mt-3 text-center text-sm font-bold text-white">{t.restoreLandingFree}</p>
+                  <button
+                    ref={uploadCtaRef}
+                    type="button"
+                    onClick={() => {
+                      setPendingUploadStyle(isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : null);
+                      trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
+                      fileInputRef.current?.click();
+                    }}
+                    onDragEnter={(event) => { event.preventDefault(); setIsUploadDragging(true); }}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDragLeave={() => setIsUploadDragging(false)}
+                    onDrop={handleImageDrop}
+                    className={`mt-4 flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md px-4 py-3 text-base font-extrabold text-white shadow-[0_16px_36px_rgba(0,0,0,0.24)] transition-colors active:translate-y-px min-[360px]:mt-7 min-[360px]:min-h-16 min-[360px]:px-5 min-[360px]:py-4 sm:text-lg ${isUploadDragging ? 'bg-white text-lab-ink' : 'bg-lab-coral hover:bg-white hover:text-lab-ink'}`}
+                  >
+                    <ICONS.Camera /> {isRestoreMode ? t.restoreLandingCta : t.startBtn}
+                  </button>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#d8ece6] min-[360px]:mt-3 min-[360px]:text-sm">
+                    {isRestoreMode ? t.restoreLandingFree : t.freeNoSignup}
+                  </p>
+                </div>
 
-              <div className="mt-7 w-full max-w-xl border-y border-white/10 text-left">
-                {[t.restoreTrustFace, t.restoreTrustOriginal, t.restoreTrustPreview].map((promise, index) => (
-                  <div key={promise} className={`flex min-h-12 items-center gap-3 py-3 text-sm leading-5 text-slate-300 ${index > 0 ? 'border-t border-white/10' : ''}`}>
-                    <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-gold/70">
-                      <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-                    </span>
-                    <span>{promise}</span>
+                <figure className="order-1 grid h-24 grid-cols-2 overflow-hidden bg-[#0c201d] min-[360px]:h-40 lg:hidden">
+                  <div className="relative overflow-hidden border-r border-white/40">
+                    <img src="/demo/restoration-before.webp" alt={t.demoBefore} className="h-full w-full object-cover object-top" />
+                    <span className="absolute bottom-2 left-2 rounded bg-lab-ink px-2 py-1 text-xs font-bold text-white">{t.demoBefore}</span>
                   </div>
-                ))}
-              </div>
-
-              <figure className="mt-12 w-full max-w-xl">
-                <h3 className="mb-4 text-center font-serif text-2xl text-white sm:text-3xl">{t.restoreExampleTitle}</h3>
-                <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#111419] shadow-2xl">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-black">
-                    <img
-                      src={restoreDemoAfter ? '/demo/restoration-after.webp' : '/demo/restoration-before.webp'}
-                      alt={restoreDemoAfter ? t.demoAfter : t.demoBefore}
-                      className="h-full w-full object-cover object-top"
-                    />
-                    <span className={`absolute bottom-3 left-3 rounded-md px-3 py-1.5 text-xs font-bold uppercase ${restoreDemoAfter ? 'bg-gold text-black' : 'bg-black/80 text-white'}`}>
-                      {restoreDemoAfter ? t.demoAfter : t.demoBefore}
-                    </span>
+                  <div className="relative overflow-hidden">
+                    <img src="/demo/restoration-after.webp" alt={t.demoAfter} className="h-full w-full object-cover object-top" />
+                    <span className="absolute bottom-2 left-2 rounded bg-lab-teal px-2 py-1 text-xs font-bold text-white">{t.demoAfter}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-3 p-3 sm:p-4">
-                    <div className="grid flex-1 grid-cols-2 rounded-xl bg-black/50 p-1" role="group" aria-label={`${t.demoBefore} / ${t.demoAfter}`}>
+                </figure>
+
+                <figure className="relative hidden min-h-[360px] overflow-hidden bg-[#0c201d] lg:block lg:min-h-full">
+                  <img
+                    src={restoreDemoAfter ? '/demo/restoration-after.webp' : '/demo/restoration-before.webp'}
+                    alt={restoreDemoAfter ? t.demoAfter : t.demoBefore}
+                    className="absolute inset-0 h-full w-full object-cover object-top"
+                  />
+                  <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-3">
+                    <div className="grid grid-cols-2 rounded-md bg-white p-1 shadow-[0_10px_26px_rgba(0,0,0,0.24)]" role="group" aria-label={`${t.demoBefore} / ${t.demoAfter}`}>
                       <button
                         type="button"
                         onClick={() => setRestoreDemoAfter(false)}
                         aria-pressed={!restoreDemoAfter}
-                        className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${!restoreDemoAfter ? 'bg-white text-black' : 'text-slate-300 hover:text-white'}`}
+                        className={`min-h-10 rounded px-4 text-sm font-bold ${!restoreDemoAfter ? 'bg-lab-ink text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
                       >
                         {t.demoBefore}
                       </button>
@@ -642,120 +642,101 @@ const App: React.FC = () => {
                         type="button"
                         onClick={() => setRestoreDemoAfter(true)}
                         aria-pressed={restoreDemoAfter}
-                        className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${restoreDemoAfter ? 'bg-gold text-black' : 'text-slate-300 hover:text-white'}`}
+                        className={`min-h-10 rounded px-4 text-sm font-bold ${restoreDemoAfter ? 'bg-lab-teal text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
                       >
                         {t.demoAfter}
                       </button>
                     </div>
-                    <a
-                      href="https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 text-xs text-slate-400 underline decoration-slate-600 underline-offset-4 hover:text-white"
-                    >
+                    <a href="https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg" target="_blank" rel="noreferrer" className="rounded bg-white px-3 py-2 text-xs font-semibold text-lab-ink underline underline-offset-2">
                       {t.demoSource}
                     </a>
                   </div>
-                </div>
-                <figcaption className="px-2 pt-3 text-center text-xs leading-5 text-slate-400">{t.demoCaption}</figcaption>
-              </figure>
+                </figure>
+              </div>
             </section>
-          );
-        }
 
-        return (
-          <section className="max-w-2xl mx-auto flex flex-col items-center animate-in fade-in zoom-in-95 duration-500">
-            <div className="text-center mb-4 sm:mb-6">
-              <p className="text-gold text-[10px] uppercase font-bold tracking-[0.28em] mb-2">{t.demoEyebrow}</p>
-              <h2 className="text-3xl sm:text-5xl font-serif text-white italic leading-tight">{t.uploadTitle}</h2>
-              <p className="text-slate-400 text-sm sm:text-base max-w-lg mx-auto mt-2 leading-relaxed">{t.uploadDesc}</p>
+            <div className="grid border-x border-b border-lab-line bg-white sm:grid-cols-3">
+              {[t.restoreTrustFace, t.restoreTrustOriginal, t.restoreTrustPreview].map((promise, index) => (
+                <div key={promise} className={`flex min-h-20 items-center gap-3 px-5 py-4 text-sm font-semibold leading-5 text-lab-ink ${index > 0 ? 'border-t border-lab-line sm:border-l sm:border-t-0' : ''}`}>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lab-teal text-sm font-extrabold text-white" aria-hidden="true">✓</span>
+                  <span>{promise}</span>
+                </div>
+              ))}
             </div>
 
-            <button
-              ref={uploadCtaRef}
-              type="button"
-              onClick={() => {
-                trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
-                fileInputRef.current?.click();
-              }}
-              className="group mb-3 w-full max-w-md min-h-14 rounded-2xl bg-gold px-6 py-4 text-lg font-black text-black shadow-[0_16px_40px_rgba(194,163,93,0.3)] transition-all hover:bg-white active:scale-[0.98] flex items-center justify-center gap-3"
-            >
-              {t.startBtn} <ICONS.Magic />
-            </button>
-            <p className="mb-5 text-center text-xs font-semibold text-slate-300">{t.freeNoSignup}</p>
-
-            <figure className="w-full max-w-md">
-              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 shadow-2xl">
-                <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-black">
-                  <img src="/demo/restoration-before.webp" alt={t.demoBefore} className="h-full w-full object-cover object-top" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/75 px-2.5 py-1 text-[10px] font-bold uppercase text-white">{t.demoBefore}</span>
+            {!isRestoreMode && (
+              <section className="py-12 sm:py-16">
+                <div className="mb-7 max-w-2xl">
+                  <h2 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-4xl">{t.chooseStyle}</h2>
+                  <p className="mt-3 text-base leading-7 text-lab-ink/70">{t.modeStartHint || t.howItWorks}</p>
                 </div>
-                <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-black">
-                  <img src="/demo/restoration-after.webp" alt={t.demoAfter} className="h-full w-full object-cover object-top" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-gold px-2.5 py-1 text-[10px] font-bold uppercase text-black">{t.demoAfter}</span>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    { id: PhotoStyle.RESTORE_OLD_PHOTO, icon: <ICONS.Restore />, title: t.restoreOldPhoto, desc: t.restoreOldPhotoDesc, tone: 'bg-lab-teal text-white' },
+                    { id: PhotoStyle.CLASSIC_STUDIO, icon: <ICONS.Studio />, title: t.classicStudio, desc: t.classicStudioDesc, tone: 'bg-white text-lab-ink' },
+                    { id: PhotoStyle.FASHION_EDITORIAL, icon: <ICONS.Fashion />, title: t.fashionEditorial, desc: t.fashionEditorialDesc, tone: 'bg-[#fff1ed] text-lab-ink' },
+                    { id: PhotoStyle.BUSINESS_LUXE, icon: <ICONS.Luxe />, title: t.businessLuxe, desc: t.businessLuxeDesc, tone: 'bg-[#eaf0ff] text-lab-ink' },
+                  ].map((style) => (
+                    <button
+                      key={style.id}
+                      type="button"
+                      onClick={() => {
+                        setPendingUploadStyle(style.id);
+                        trackFunnel('style_selected', { language, screen: AppStep.UPLOAD, style: style.id });
+                        fileInputRef.current?.click();
+                      }}
+                      className={`min-h-48 rounded-lg border border-lab-line p-5 text-left transition-transform hover:-translate-y-1 ${style.tone}`}
+                    >
+                      <span className="mb-8 flex h-11 w-11 items-center justify-center rounded-md border border-current/20">{style.icon}</span>
+                      <span className="block text-lg font-extrabold">{style.title}</span>
+                      <span className="mt-2 block text-sm leading-5 opacity-75">{style.desc}</span>
+                    </button>
+                  ))}
                 </div>
-              </div>
-              <figcaption className="flex items-start justify-between gap-3 px-1 pt-2 text-[10px] leading-relaxed text-slate-500">
-                <span>{t.demoCaption}</span>
-                <a
-                  href="https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 underline decoration-slate-700 underline-offset-2 hover:text-white"
-                >
-                  {t.demoSource}
-                </a>
-              </figcaption>
-            </figure>
-            <p className="mt-3 hidden sm:block text-center text-[11px] text-slate-600">{t.howItWorks}</p>
-          </section>
+              </section>
+            )}
+          </div>
         );
 
       case AppStep.CHOOSE_STYLE:
         return (
-          <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-16 items-start animate-in slide-in-from-bottom-8 duration-700">
+          <div className="mx-auto grid max-w-[1120px] items-start gap-8 py-4 font-lab animate-in slide-in-from-bottom-8 duration-500 lg:grid-cols-[0.85fr_1.15fr] lg:gap-12 lg:py-8">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               aria-label={t.replacePhoto}
-              className="group relative sticky top-10 hidden w-full cursor-pointer overflow-hidden rounded-[3rem] border border-white/10 bg-black text-left shadow-2xl transition-colors hover:border-gold/60 focus:outline-none focus:ring-2 focus:ring-gold lg:block"
+              className="group relative sticky top-28 hidden w-full cursor-pointer overflow-hidden rounded-lg border border-lab-line bg-white text-left shadow-[0_18px_48px_rgba(21,48,43,0.12)] transition-colors hover:border-lab-teal lg:block"
             >
-              {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-auto w-full opacity-75 transition-opacity duration-500 group-hover:opacity-100 group-focus:opacity-100" />}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+              {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-auto max-h-[680px] w-full object-contain" />}
               <div className="pointer-events-none absolute inset-x-6 bottom-6 flex items-center justify-between gap-3">
-                <span className="rounded-full border border-gold/20 bg-black/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.3em] text-gold backdrop-blur-md">{t.originalPhoto}</span>
-                <span className="flex min-h-11 items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-black text-black shadow-lg">
+                <span className="rounded-md bg-lab-ink px-4 py-2 text-xs font-bold text-white">{t.originalPhoto}</span>
+                <span className="flex min-h-11 items-center gap-2 rounded-md bg-lab-coral px-4 py-2 text-xs font-extrabold text-white shadow-lg">
                   <ICONS.Camera /> {t.replacePhoto}
                 </span>
               </div>
             </button>
 
-            <div className="space-y-10 pb-20">
+            <div className="space-y-8 pb-16">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 aria-label={t.replacePhoto}
-                className="group relative h-52 w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-xl focus:outline-none focus:ring-2 focus:ring-gold sm:h-64 lg:hidden"
+                className="group relative h-52 w-full overflow-hidden rounded-lg border border-lab-line bg-white shadow-[0_12px_32px_rgba(21,48,43,0.1)] sm:h-64 lg:hidden"
               >
                 {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-full w-full object-contain" />}
-                <span className="pointer-events-none absolute inset-x-3 bottom-3 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-gold px-4 py-3 text-sm font-black text-black shadow-lg">
+                <span className="pointer-events-none absolute inset-x-3 bottom-3 flex min-h-12 items-center justify-center gap-2 rounded-md bg-lab-coral px-4 py-3 text-sm font-extrabold text-white shadow-lg">
                   <ICONS.Camera /> {t.replacePhoto}
                 </span>
               </button>
 
-              <div className="space-y-4">
-                <h2 className="text-4xl md:text-5xl font-serif text-white italic">2. {t.chooseStyle}</h2>
-                <div className="flex items-center gap-4">
-                  <div className="h-px w-16 bg-gold/50"></div>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{t.setupShot}</span>
-                </div>
+              <div>
+                <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-4xl">{t.chooseStyle}</h1>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-lab-ink/65">{premiumFeaturesEnabled ? t.setupShot : t.modeStartHint}</p>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-end">
-                  <label className="text-gold text-[10px] uppercase font-bold tracking-[0.4em]">{t.aspectRatio}</label>
-                </div>
-                <div className="flex gap-4">
+              <div className="space-y-3">
+                <label className="text-sm font-bold text-lab-ink">{t.aspectRatio}</label>
+                <div className="grid grid-cols-2 rounded-lg border border-lab-line bg-white p-1">
                   {[
                     { id: '9:16' as AspectRatio, label: t.portrait, sub: '9:16' },
                     { id: '16:9' as AspectRatio, label: t.landscape, sub: '16:9' }
@@ -764,20 +745,18 @@ const App: React.FC = () => {
                       key={format.id}
                       type="button"
                       onClick={() => setAspectRatio(format.id)}
-                      className={`flex-1 py-5 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center gap-1 ${aspectRatio === format.id ? 'border-gold bg-gold/10 text-gold shadow-lg' : 'border-white/5 bg-white/5 text-slate-500 hover:border-white/20'}`}
+                      className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md px-3 py-2 transition-colors ${aspectRatio === format.id ? 'bg-lab-blue text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
                     >
                       <span className="font-bold">{format.label}</span>
-                      <span className="text-[8px] opacity-50 uppercase tracking-widest">{format.sub}</span>
+                      <span className="text-xs opacity-70">{format.sub}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-gold text-[10px] uppercase font-bold tracking-[0.4em]">{t.chooseStyleLabel}</label>
-                </div>
-                <div className="grid gap-3">
+              <div className="space-y-3">
+                <label className="text-sm font-bold text-lab-ink">{t.chooseStyleLabel}</label>
+                <div className="grid gap-3 sm:grid-cols-2">
                   {[
                     { id: PhotoStyle.RESTORE_OLD_PHOTO, icon: <ICONS.Restore />, title: t.restoreOldPhoto || 'Restore Old Photo', desc: t.restoreOldPhotoDesc || 'Repair damage and colorize with period-accurate tones.' },
                     { id: PhotoStyle.CLASSIC_STUDIO, icon: <ICONS.Studio />, title: t.classicStudio, desc: t.classicStudioDesc },
@@ -795,12 +774,12 @@ const App: React.FC = () => {
                         }
                       }}
                       disabled={processing.isProcessing}
-                      className={`p-5 rounded-[1.8rem] border-2 flex items-center gap-5 text-left transition-all group ${selectedStyle === style.id ? 'border-gold bg-gold/5 ring-1 ring-gold/20' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
+                      className={`group flex min-h-32 items-start gap-4 rounded-lg border p-4 text-left transition-all ${selectedStyle === style.id ? 'border-lab-teal bg-lab-teal text-white shadow-[0_12px_26px_rgba(8,120,111,0.18)]' : 'border-lab-line bg-white text-lab-ink hover:-translate-y-0.5 hover:border-lab-teal'}`}
                     >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${selectedStyle === style.id ? 'bg-gold text-black' : 'bg-white/5 text-slate-500'}`}>{style.icon}</div>
-                      <div>
-                        <div className={`font-bold text-lg ${selectedStyle === style.id ? 'text-gold' : 'text-white'}`}>{style.title}</div>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-widest">{style.desc}</div>
+                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md ${selectedStyle === style.id ? 'bg-white text-lab-teal' : 'bg-lab-mist text-lab-ink'}`}>{style.icon}</div>
+                      <div className="min-w-0">
+                        <div className="text-base font-extrabold leading-5">{style.title}</div>
+                        <div className={`mt-2 text-sm leading-5 ${selectedStyle === style.id ? 'text-white/80' : 'text-lab-ink/60'}`}>{style.desc}</div>
                       </div>
                     </button>
                   ))}
@@ -808,8 +787,8 @@ const App: React.FC = () => {
               </div>
 
               {premiumFeaturesEnabled && (
-                <div className="space-y-6">
-                  <label className="text-gold text-[10px] uppercase font-bold tracking-[0.4em]">{t.customPrompt}</label>
+                <div className="space-y-4 border-t border-lab-line pt-6">
+                  <label className="text-sm font-bold text-lab-ink">{t.customPrompt}</label>
                   <div className="space-y-4">
                     {selectedStyle !== PhotoStyle.RESTORE_OLD_PHOTO && (
                       <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -818,7 +797,7 @@ const App: React.FC = () => {
                             key={tag}
                             type="button"
                             onClick={() => addTag(tag)}
-                            className="px-4 py-2 bg-white/5 hover:bg-gold/10 border border-white/10 rounded-full text-[10px] text-slate-400 hover:text-gold transition-all whitespace-nowrap uppercase tracking-widest font-bold"
+                            className="whitespace-nowrap rounded-full border border-lab-line bg-white px-4 py-2 text-xs font-semibold text-lab-ink transition-colors hover:border-lab-teal hover:text-lab-teal"
                           >
                             + {tag}
                           </button>
@@ -831,7 +810,7 @@ const App: React.FC = () => {
                         value={customPrompt}
                         onChange={(e) => setCustomPrompt(e.target.value)}
                         placeholder={selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorationDetailsPlaceholder || 'Optional: approximate decade, country, uniform, or family context...') : t.customPromptPlaceholder}
-                        className="w-full bg-white/5 border border-white/10 rounded-[2rem] p-6 text-white focus:border-gold outline-none h-32 md:h-40 resize-none transition-all placeholder:text-slate-700 text-lg shadow-inner focus:bg-white/[0.07]"
+                        className="h-32 w-full resize-none rounded-lg border border-lab-line bg-white p-5 text-base text-lab-ink outline-none transition-colors placeholder:text-lab-ink/40 focus:border-lab-teal md:h-36"
                       />
                     </div>
                   </div>
@@ -843,32 +822,32 @@ const App: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleGenerate(selectedStyle)}
-                    className="w-full py-7 bg-gold text-black rounded-[2rem] font-black text-2xl flex items-center justify-center gap-5 transition-all hover:bg-white hover:scale-[1.02] shadow-[0_20px_50px_rgba(194,163,93,0.35)] active:scale-95"
+                    className="flex min-h-16 w-full items-center justify-center gap-4 rounded-md bg-lab-coral px-5 py-4 text-lg font-extrabold text-white shadow-[0_16px_34px_rgba(240,100,73,0.25)] transition-colors hover:bg-lab-ink"
                   >
                     <ICONS.Magic /> {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorePhotoBtn || 'Restore Old Photo') : t.generateBtn}
                   </button>
-                  <p className="text-center mt-4 text-[10px] text-slate-500 uppercase tracking-[0.35em] font-bold">
+                  <p className="mt-3 text-center text-sm font-semibold text-lab-ink/60">
                     {userEmail ? `${t.creditsLeft}: ${credits}` : `${t.freeCredits}: ${freeCreditsLeft}`}
                   </p>
                 </div>
               )}
 
-              <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-600 hover:text-white text-[10px] uppercase tracking-[0.5em] font-bold py-4 transition-all hover:translate-x-[-4px]">← {t.backToUpload || "Back to Upload"}</button>
+              <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="rounded-md px-2 py-3 text-sm font-bold text-lab-teal transition-colors hover:bg-lab-mist">← {t.backToUpload || "Back to Upload"}</button>
             </div>
           </div>
         );
 
       case AppStep.RESULT:
         return (
-          <div className="max-w-6xl mx-auto flex flex-col items-center gap-12 lg:gap-16 animate-in fade-in zoom-in-95 duration-1000 mb-20">
-            <div className="text-center space-y-4">
-              <h2 className="text-5xl md:text-6xl font-serif text-white italic">{selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoTitle || 'Restored Photo') : t.resultTitle}</h2>
-              <div className="inline-block px-6 py-1 bg-gold/5 rounded-full border border-gold/20 text-gold text-[10px] uppercase tracking-[0.5em] font-bold">{selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoBadge || 'AI Photo Restoration') : 'Professional AI Portrait'}</div>
+          <div className="mx-auto mb-16 flex max-w-[1120px] flex-col items-center gap-6 py-3 font-lab animate-in fade-in zoom-in-95 duration-500 sm:gap-8 sm:py-8 lg:gap-10">
+            <div className="text-center">
+              <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-5xl">{selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoTitle || 'Restored Photo') : t.resultTitle}</h1>
+              <p className="mt-3 hidden text-sm font-semibold text-lab-teal sm:block">{selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoBadge || 'AI Photo Restoration') : t.uploadTitle}</p>
             </div>
 
-            <div className="flex flex-col items-center gap-6 w-full">
+            <div className="flex w-full flex-col items-center gap-4">
               <div
-                className={`relative rounded-[3.5rem] overflow-hidden border border-white/10 shadow-[0_0_100px_rgba(194,163,93,0.15)] group transition-all duration-700 w-full ${aspectRatio === '9:16' ? 'max-w-md' : 'max-w-5xl'}`}
+                className={`photo-arrive group relative w-full overflow-hidden rounded-lg border border-lab-line bg-white shadow-[0_20px_58px_rgba(21,48,43,0.16)] transition-all duration-500 ${aspectRatio === '9:16' ? 'max-w-md' : 'max-w-5xl'}`}
                 onMouseDown={() => setShowOriginal(true)}
                 onMouseUp={() => setShowOriginal(false)}
                 onTouchStart={() => setShowOriginal(true)}
@@ -877,15 +856,15 @@ const App: React.FC = () => {
                 <img
                   src={showOriginal ? originalImage! : resultImage!}
                   alt="Result"
-                  className="w-full h-auto transition-opacity duration-300"
+                  className="mx-auto h-auto max-h-[420px] w-auto max-w-full object-contain transition-opacity duration-300 sm:max-h-none sm:w-full"
                 />
-                <div className="absolute top-8 right-8 bg-black/60 backdrop-blur-xl border border-white/10 px-5 py-2 rounded-full text-[10px] text-white uppercase tracking-widest font-bold z-20">
-                  {showOriginal ? t.originalPhoto : (selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoTitle || 'Restored Photo') : t.resultTitle)}
+                <div className="absolute right-3 top-3 z-20 rounded-md bg-lab-ink px-4 py-2 text-xs font-bold text-white sm:right-5 sm:top-5">
+                  {showOriginal ? t.originalPhoto : (selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? t.demoAfter : t.resultTitle)}
                 </div>
 
                 {!showOriginal && (
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-8">
-                    <span className="text-xs text-gold/80 italic font-medium bg-black/40 px-6 py-3 rounded-full backdrop-blur-md border border-gold/20">
+                  <div className="absolute inset-x-0 bottom-0 flex justify-center bg-lab-ink/70 p-4 opacity-0 transition-opacity group-hover:opacity-100">
+                    <span className="rounded-md bg-white px-5 py-2 text-xs font-bold text-lab-ink">
                       {t.showOriginal}
                     </span>
                   </div>
@@ -893,7 +872,7 @@ const App: React.FC = () => {
               </div>
 
               <button
-                className="lg:hidden px-8 py-3 bg-white/5 border border-white/10 rounded-full text-[10px] text-slate-400 uppercase tracking-widest font-bold active:bg-gold active:text-black transition-colors"
+                className="min-h-11 rounded-md border border-lab-line bg-white px-6 py-3 text-sm font-bold text-lab-teal transition-colors active:bg-lab-teal active:text-white"
                 onPointerDown={() => setShowOriginal(true)}
                 onPointerUp={() => setShowOriginal(false)}
               >
@@ -901,11 +880,11 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="w-full max-w-3xl space-y-8">
+            <div className="w-full max-w-3xl space-y-5">
               {premiumFeaturesEnabled && (
-                <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-10 rounded-[2.5rem] border border-white/10 space-y-8 shadow-2xl">
+                <div className="space-y-6 rounded-lg border border-lab-line bg-white p-6 shadow-[0_12px_34px_rgba(21,48,43,0.08)] sm:p-8">
                   <div className="flex items-center justify-between">
-                    <label className="text-gold text-[10px] font-bold uppercase tracking-[0.4em]">{t.refineTitle}</label>
+                    <label className="text-base font-extrabold text-lab-ink">{t.refineTitle}</label>
                     <ICONS.Magic />
                   </div>
                   <div className="flex flex-col sm:flex-row gap-4">
@@ -916,7 +895,7 @@ const App: React.FC = () => {
                           value={correctionRequest}
                           onChange={(e) => setCorrectionRequest(e.target.value)}
                           placeholder={t.refinePlaceholder}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white focus:border-gold outline-none transition-all placeholder:text-slate-700"
+                          className="w-full rounded-md border border-lab-line bg-lab-paper px-5 py-4 text-lab-ink outline-none transition-colors placeholder:text-lab-ink/40 focus:border-lab-teal"
                         />
                       </div>
                       <button
@@ -925,7 +904,7 @@ const App: React.FC = () => {
                         onPointerUp={stopRecording}
                         onPointerCancel={stopRecording}
                         onPointerLeave={stopRecording}
-                        className={`w-16 flex items-center justify-center rounded-2xl border-2 transition-all ${isRecording ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' : 'bg-gold/10 border-gold/20 text-gold hover:bg-gold hover:text-black'}`}
+                        className={`flex w-14 items-center justify-center rounded-md border transition-all ${isRecording ? 'animate-pulse border-red-500 bg-red-50 text-red-600' : 'border-lab-line bg-lab-mist text-lab-teal hover:bg-lab-teal hover:text-white'}`}
                         title={language === Language.RU ? 'Удерживайте для записи голоса' : 'Hold to record voice'}
                       >
                         <ICONS.Mic />
@@ -935,7 +914,7 @@ const App: React.FC = () => {
                       type="button"
                       onClick={handleRefine}
                       disabled={!correctionRequest || processing.isProcessing}
-                      className="px-10 bg-gold text-black rounded-2xl font-black hover:bg-white transition-all disabled:opacity-20 shadow-xl active:scale-95"
+                      className="rounded-md bg-lab-teal px-8 py-4 font-extrabold text-white transition-colors hover:bg-lab-ink disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {t.refineBtn}
                     </button>
@@ -943,17 +922,17 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={handleDownload}
-                  className="flex-2 py-6 bg-white text-black rounded-[2rem] font-black text-lg flex items-center justify-center gap-4 hover:scale-[1.02] transition-all shadow-xl active:scale-95 px-12"
+                  className="flex min-h-16 flex-[2] items-center justify-center gap-3 rounded-md bg-lab-coral px-8 py-4 text-lg font-extrabold text-white shadow-[0_14px_32px_rgba(240,100,73,0.22)] transition-colors hover:bg-lab-ink"
                 >
-                  <ICONS.Download /> DOWNLOAD
+                  <ICONS.Download /> {t.download}
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(AppStep.UPLOAD)}
-                  className="flex-1 py-6 bg-white/5 border border-white/20 text-white rounded-[2rem] font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-3 active:scale-95"
+                  className="flex min-h-16 flex-1 items-center justify-center gap-3 rounded-md border border-lab-line bg-white px-6 py-4 font-bold text-lab-ink transition-colors hover:bg-lab-mist"
                 >
                   <ICONS.Rotate /> {t.backToUpload}
                 </button>
@@ -963,7 +942,7 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleAnimatePhotoClick}
-                  className="w-full max-w-md min-h-14 border border-gold/50 bg-gold/10 text-gold rounded-2xl px-6 py-4 font-black text-base flex items-center justify-center gap-3 hover:bg-gold hover:text-black transition-all active:scale-[0.98]"
+                  className="flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md border border-lab-blue bg-[#eaf0ff] px-6 py-4 text-base font-extrabold text-lab-blue transition-colors hover:bg-lab-blue hover:text-white"
                 >
                   <span aria-hidden="true" className="text-lg">▶</span>
                   {t.animatePhoto}
@@ -972,50 +951,50 @@ const App: React.FC = () => {
               )}
             </div>
 
-            <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-600 hover:text-gold text-[10px] uppercase tracking-[0.5em] font-bold pb-10 transition-colors">NEW SESSION</button>
+            <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="rounded-md px-4 py-3 text-sm font-bold text-lab-teal transition-colors hover:bg-lab-mist">{t.backToUpload}</button>
           </div>
         );
 
       case AppStep.HISTORY:
         return (
-          <div className="max-w-5xl mx-auto flex flex-col items-center gap-10 animate-in fade-in zoom-in-95 duration-1000 mb-20">
-            <div className="text-center space-y-3">
-              <h2 className="text-4xl md:text-5xl font-serif text-white italic">{t.historyTitle || 'My Portraits'}</h2>
-              <p className="text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+          <div className="mx-auto mb-16 flex max-w-5xl flex-col items-center gap-8 py-6 font-lab animate-in fade-in zoom-in-95 duration-500">
+            <div className="text-center">
+              <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-5xl">{t.historyTitle || 'My Portraits'}</h1>
+              <p className="mt-3 text-sm font-semibold text-lab-ink/55">
                 {userEmail ? userEmail : ''}
               </p>
             </div>
 
             {loadingHistory ? (
               <div className="flex flex-col items-center gap-6 py-20">
-                <div className="w-16 h-16 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
-                <p className="text-slate-500 text-sm uppercase tracking-widest">Loading...</p>
+                <div className="h-14 w-14 animate-spin rounded-full border-4 border-lab-mist border-t-lab-teal" />
+                <p className="text-sm font-semibold text-lab-ink/60">Loading...</p>
               </div>
             ) : historyItems.length === 0 ? (
-              <div className="w-full bg-white/5 border border-white/10 rounded-3xl p-16 text-center">
-                <div className="w-20 h-20 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">📸</div>
-                <p className="text-slate-400 text-lg mb-8">{t.historyEmpty || "You don't have any generated portraits yet."}</p>
+              <div className="w-full rounded-lg border border-lab-line bg-white px-6 py-14 text-center sm:p-16">
+                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-md bg-lab-mist text-lab-teal"><ICONS.Camera /></div>
+                <p className="mb-8 text-lg text-lab-ink/70">{t.historyEmpty || "You don't have any generated portraits yet."}</p>
                 <button
                   type="button"
                   onClick={() => setStep(AppStep.UPLOAD)}
-                  className="px-8 py-4 bg-gold text-black rounded-full font-bold hover:bg-white transition-all transform hover:-translate-y-1 shadow-[0_10px_30px_rgba(194,163,93,0.3)] active:scale-95 inline-flex items-center gap-3"
+                  className="inline-flex min-h-14 items-center gap-3 rounded-md bg-lab-coral px-8 py-4 font-extrabold text-white transition-colors hover:bg-lab-ink"
                 >
                   <ICONS.Magic /> {t.startBtn}
                 </button>
               </div>
             ) : (
-              <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {historyItems.map((item) => (
-                  <div key={item.id} className="group relative rounded-[1.5rem] overflow-hidden border border-white/10 bg-black shadow-xl hover:border-gold/40 transition-all duration-500">
+                  <div key={item.id} className="group relative overflow-hidden rounded-lg border border-lab-line bg-white shadow-[0_10px_28px_rgba(21,48,43,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-lab-teal">
                     <img
                       src={item.generated_image_url}
                       alt={item.style_name}
                       className="w-full h-auto block group-hover:scale-105 transition-transform duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 gap-3">
+                    <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 bg-lab-ink/90 p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                       <div>
-                        <p className="text-gold text-[9px] uppercase tracking-widest font-bold">{item.style_name?.replace(/_/g, ' ')}</p>
-                        <p className="text-slate-400 text-[8px]">{new Date(item.created_at).toLocaleDateString()}</p>
+                        <p className="text-xs font-bold text-white">{item.style_name?.replace(/_/g, ' ')}</p>
+                        <p className="mt-1 text-xs text-white/65">{new Date(item.created_at).toLocaleDateString()}</p>
                       </div>
                       <button
                         type="button"
@@ -1034,7 +1013,7 @@ const App: React.FC = () => {
                           a.click();
                           URL.revokeObjectURL(url);
                         }}
-                        className="w-full py-2.5 bg-gold text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                        className="flex w-full items-center justify-center gap-2 rounded-md bg-lab-coral px-3 py-2.5 text-xs font-extrabold text-white transition-colors hover:bg-white hover:text-lab-ink"
                       >
                         <ICONS.Download /> {t.download || 'Download'}
                       </button>
@@ -1044,7 +1023,7 @@ const App: React.FC = () => {
               </div>
             )}
 
-            <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="text-slate-500 hover:text-white text-[10px] uppercase tracking-[0.5em] font-bold transition-all">← {t.backToUpload || "Back to Upload"}</button>
+            <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="rounded-md px-4 py-3 text-sm font-bold text-lab-teal transition-colors hover:bg-lab-mist">← {t.backToUpload || "Back to Upload"}</button>
           </div>
         );
     }
@@ -1053,9 +1032,10 @@ const App: React.FC = () => {
   // No blocked root. We can render main layout directly.
 
   return (
-    <div className="min-h-screen flex flex-col pb-24 bg-dark font-sans selection:bg-gold selection:text-black scroll-smooth">
+    <div className="flex min-h-screen flex-col bg-lab-paper font-lab text-lab-ink selection:bg-lab-coral selection:text-white">
       <Header
         language={language}
+        onLanguageChange={setLanguage}
         mode={isRestoreMode ? 'restore' : 'studio'}
         credits={userEmail ? credits : freeCreditsLeft}
         userEmail={userEmail}
@@ -1087,30 +1067,27 @@ const App: React.FC = () => {
         ref={fileInputRef}
         onChange={handleImageUpload}
       />
-      <main className="container mx-auto px-4 sm:px-6 pt-2 sm:pt-8 relative z-10 flex-grow">
+      <main className="relative z-10 w-full flex-grow px-4 py-4 sm:px-6 sm:py-6">
         {renderContent()}
       </main>
 
-      <footer className="text-center py-10 opacity-50 hover:opacity-100 transition-opacity mt-auto">
-        <a href="mailto:oleg@lihtneai.ee" className="text-[10px] text-slate-500 hover:text-white uppercase tracking-widest block mb-2">{TRANSLATIONS[language]?.deleteDataMsg || 'To delete your images and data, write to oleg@lihtneai.ee'}</a>
-        <a href="/privacy-policy.html" target="_blank" className="text-[10px] text-slate-500 hover:text-white uppercase tracking-widest block underline">{TRANSLATIONS[language]?.privacyPolicyLink || 'Privacy Policy'}</a>
+      <footer className="mt-auto border-t border-lab-line bg-white px-4 py-8 text-center">
+        <a href="mailto:oleg@lihtneai.ee" className="block text-xs leading-5 text-lab-ink/60 hover:text-lab-teal">{TRANSLATIONS[language]?.deleteDataMsg || 'To delete your images and data, write to oleg@lihtneai.ee'}</a>
+        <a href="/privacy-policy.html" target="_blank" className="mt-2 block text-xs font-semibold text-lab-teal underline underline-offset-4">{TRANSLATIONS[language]?.privacyPolicyLink || 'Privacy Policy'}</a>
       </footer>
 
       {processing.isProcessing && (
-        <div className="fixed inset-0 bg-black/98 backdrop-blur-3xl z-[100] flex items-center justify-center animate-in fade-in duration-500">
-          <div className="text-center space-y-12 p-10">
-            <div className="relative w-32 h-32 mx-auto">
-              <div className="absolute inset-0 border-[4px] border-gold/10 rounded-full"></div>
-              <div className="absolute inset-0 border-[4px] border-gold border-t-transparent rounded-full animate-spin"></div>
-              <div className="absolute inset-0 flex items-center justify-center text-gold scale-[1.5]"><ICONS.Magic /></div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-lab-paper/95 px-5 animate-in fade-in duration-300">
+          <div className="w-full max-w-lg rounded-lg border border-lab-line bg-white p-7 text-center shadow-[0_24px_70px_rgba(21,48,43,0.18)] sm:p-10">
+            <div className="relative mx-auto h-20 w-20">
+              <div className="absolute inset-0 rounded-md bg-lab-mist"></div>
+              <div className="absolute inset-0 flex items-center justify-center scale-[1.35] text-lab-teal"><ICONS.Magic /></div>
             </div>
-            <div className="space-y-6">
-              <h2 className="text-3xl md:text-4xl font-serif text-white italic tracking-wide animate-pulse">{processing.status}</h2>
-              <div className="flex flex-col items-center gap-2">
-                <p className="text-gold/60 text-[10px] uppercase tracking-[0.5em] font-bold">Neural Engine Processing</p>
-                <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-gold animate-[loading_30s_linear]"></div>
-                </div>
+            <div className="mt-7">
+              <h2 className="text-2xl font-extrabold tracking-[-0.02em] text-lab-ink sm:text-3xl">{processing.status}</h2>
+              <p className="mt-3 text-sm text-lab-ink/60">ShotMe.ee</p>
+              <div className="mx-auto mt-7 h-2 w-full max-w-sm overflow-hidden rounded-full bg-lab-mist">
+                <div className="h-full origin-left rounded-full bg-lab-teal animate-[lab-progress_30s_linear]"></div>
               </div>
             </div>
           </div>
@@ -1118,10 +1095,6 @@ const App: React.FC = () => {
       )}
 
       <style>{`
-        @keyframes loading {
-          from { width: 0%; }
-          to { width: 100%; }
-        }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }
@@ -1179,37 +1152,37 @@ const App: React.FC = () => {
 
       {generationError && (
         <div
-          className="fixed inset-0 z-[330] flex items-center justify-center bg-black/85 backdrop-blur-md px-5"
+          className="fixed inset-0 z-[330] flex items-center justify-center bg-lab-ink/75 px-5"
           role="dialog"
           aria-modal="true"
           aria-labelledby="generation-error-title"
           onClick={() => setGenerationError(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111417] p-7 text-center shadow-2xl"
+            className="w-full max-w-md rounded-lg border border-lab-line bg-white p-7 text-center shadow-[0_24px_70px_rgba(21,48,43,0.24)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div
-              className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-gold/50 bg-gold/10 text-xl font-black text-gold"
+              className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-[#fff1ed] text-xl font-black text-lab-coral"
               aria-hidden="true"
             >
               !
             </div>
-            <h2 id="generation-error-title" className="mb-3 font-serif text-2xl italic text-white">
+            <h2 id="generation-error-title" className="mb-3 text-2xl font-extrabold text-lab-ink">
               {TRANSLATIONS[language].generationErrorTitle}
             </h2>
-            <p className="mb-3 leading-relaxed text-slate-300">
+            <p className="mb-3 leading-relaxed text-lab-ink/70">
               {generationError === 'restricted'
                 ? TRANSLATIONS[language].imageRestrictedMessage
                 : TRANSLATIONS[language].generationUnavailableMessage}
             </p>
-            <p className="mb-6 text-sm font-semibold text-gold">
+            <p className="mb-6 text-sm font-semibold text-lab-teal">
               {TRANSLATIONS[language].generationAttemptNotCharged}
             </p>
             <button
               type="button"
               onClick={() => setGenerationError(null)}
-              className="min-h-12 w-full rounded-xl bg-gold px-5 py-3 font-black text-black transition-colors hover:bg-white"
+              className="min-h-12 w-full rounded-md bg-lab-coral px-5 py-3 font-extrabold text-white transition-colors hover:bg-lab-ink"
             >
               {TRANSLATIONS[language].understood}
             </button>
@@ -1219,23 +1192,23 @@ const App: React.FC = () => {
 
       {showAnimatePaywall && (
         <div
-          className="fixed inset-0 z-[320] flex items-center justify-center bg-black/85 backdrop-blur-md px-5"
+          className="fixed inset-0 z-[320] flex items-center justify-center bg-lab-ink/75 px-5"
           role="dialog"
           aria-modal="true"
           aria-labelledby="animate-paywall-title"
           onClick={() => setShowAnimatePaywall(false)}
         >
           <div
-            className="w-full max-w-sm border border-white/10 bg-[#111417] p-7 text-center shadow-2xl rounded-2xl"
+            className="w-full max-w-sm rounded-lg border border-lab-line bg-white p-7 text-center shadow-[0_24px_70px_rgba(21,48,43,0.24)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="text-5xl mb-4" aria-hidden="true">😔</div>
-            <h2 id="animate-paywall-title" className="font-serif text-2xl text-white italic mb-3">{TRANSLATIONS[language].animatePhoto}</h2>
-            <p className="text-slate-300 leading-relaxed mb-6">{TRANSLATIONS[language].animatePremiumOnly}</p>
+            <h2 id="animate-paywall-title" className="mb-3 text-2xl font-extrabold text-lab-ink">{TRANSLATIONS[language].animatePhoto}</h2>
+            <p className="mb-6 leading-relaxed text-lab-ink/70">{TRANSLATIONS[language].animatePremiumOnly}</p>
             <button
               type="button"
               onClick={() => setShowAnimatePaywall(false)}
-              className="w-full min-h-12 rounded-xl bg-gold px-5 py-3 font-black text-black hover:bg-white transition-colors"
+              className="min-h-12 w-full rounded-md bg-lab-coral px-5 py-3 font-extrabold text-white transition-colors hover:bg-lab-ink"
             >
               {TRANSLATIONS[language].understood}
             </button>
@@ -1244,15 +1217,15 @@ const App: React.FC = () => {
       )}
 
       {paymentStatus && (
-        <div className="fixed bottom-10 left-10 z-[300] bg-gold text-black px-8 py-4 rounded-2xl font-bold shadow-2xl animate-in slide-in-from-left-10 duration-500 flex items-center gap-4">
-          <span className="text-2xl">{paymentStatus === 'success' ? '✅' : '❌'}</span>
+        <div className="fixed bottom-5 left-4 right-4 z-[300] flex items-center gap-4 rounded-lg bg-lab-ink px-5 py-4 font-bold text-white shadow-[0_20px_50px_rgba(21,48,43,0.25)] animate-in slide-in-from-left-10 duration-500 sm:bottom-8 sm:left-8 sm:right-auto">
+          <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${paymentStatus === 'success' ? 'bg-lab-teal' : 'bg-lab-coral'}`}>{paymentStatus === 'success' ? '✓' : '×'}</span>
           <div>
             <div className="text-sm">
               {paymentStatus === 'success'
                 ? (language === Language.RU ? 'Оплата прошла успешно!' : 'Payment successful!')
                 : (language === Language.RU ? 'Оплата отменена' : 'Payment cancelled')}
             </div>
-            <div className="text-[10px] opacity-70 uppercase tracking-widest">
+            <div className="mt-1 text-xs opacity-70">
               {paymentStatus === 'success'
                 ? (language === Language.RU ? 'Кредиты скоро будут зачислены' : 'Credits will be added shortly')
                 : (language === Language.RU ? 'Попробуйте еще раз' : 'Please try again')}

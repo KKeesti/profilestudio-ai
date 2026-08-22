@@ -104,65 +104,65 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, onClose, language
     const t = TEXTS[lang];
 
     return (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[210] flex items-center justify-center p-6 animate-in fade-in duration-500">
+        <div className="fixed inset-0 z-[210] flex items-center justify-center overflow-y-auto bg-lab-ink/75 p-4 font-lab animate-in fade-in duration-300 sm:p-6">
             {onClose && (
                 <button
                     onClick={onClose}
-                    className="absolute top-10 right-10 text-white/40 hover:text-white transition-colors text-4xl p-4 z-[220]"
+                    className="fixed right-4 top-4 z-[220] flex h-11 w-11 items-center justify-center rounded-md bg-white text-2xl font-bold text-lab-ink shadow-lg transition-colors hover:bg-lab-coral hover:text-white sm:right-8 sm:top-8"
                     aria-label="Close"
                 >
                     x
                 </button>
             )}
-            <div className="w-full max-w-2xl space-y-8 animate-in slide-in-from-bottom-10 duration-700">
-                <div className="text-center space-y-4">
-                    <h2 className="text-4xl md:text-5xl font-serif text-white italic">{t.title}</h2>
-                    <p className="text-slate-400 max-w-md mx-auto">{t.subtitle}</p>
+            <div className="my-auto w-full max-w-3xl rounded-lg bg-lab-paper p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom-10 duration-500 sm:p-8">
+                <div className="text-center">
+                    <h2 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-4xl">{t.title}</h2>
+                    <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-lab-ink/65 sm:text-base">{t.subtitle}</p>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-3xl px-6 py-5">
-                    <p className="text-gold text-[10px] font-black uppercase tracking-[0.3em] mb-3">{t.featuresTitle}</p>
-                    <div className="grid sm:grid-cols-3 gap-3">
+                <div className="mt-6 border-y border-lab-line py-5">
+                    <p className="mb-3 text-sm font-extrabold text-lab-ink">{t.featuresTitle}</p>
+                    <div className="grid gap-2 sm:grid-cols-3">
                         {t.features.map((feature: string) => (
-                            <div key={feature} className="text-slate-300 text-xs bg-black/20 border border-white/5 rounded-2xl px-4 py-3">
-                                {feature}
+                            <div key={feature} className="flex items-start gap-2 rounded-md bg-white px-3 py-3 text-xs font-semibold leading-5 text-lab-ink">
+                                <span className="text-lab-teal">✓</span><span>{feature}</span>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                    <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-8 hover:border-gold transition-all group relative overflow-hidden">
-                        <div className="space-y-4">
-                            <h3 className="text-2xl font-bold text-white">{t.plan1}</h3>
-                            <p className="text-slate-400 text-sm">{t.plan1Desc}</p>
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-lab-line bg-white p-5 sm:p-6">
+                        <div>
+                            <h3 className="text-xl font-extrabold text-lab-ink">{t.plan1}</h3>
+                            <p className="mt-1 text-sm text-lab-ink/60">{t.plan1Desc}</p>
                         </div>
-                        <div className="text-4xl font-black text-gold">{t.plan1Price}</div>
+                        <div className="my-6 text-4xl font-extrabold tabular-nums text-lab-ink">{t.plan1Price}</div>
                         <button
                             onClick={() => onSelect('plan_small')}
-                            className="w-full py-4 bg-white/10 text-white rounded-2xl font-bold hover:bg-gold hover:text-black transition-all"
+                            className="min-h-12 w-full rounded-md border border-lab-teal bg-white px-4 py-3 font-extrabold text-lab-teal transition-colors hover:bg-lab-teal hover:text-white"
                         >
                             {t.btn}
                         </button>
                     </div>
 
-                    <div className="bg-gold/10 border border-gold/30 rounded-[2.5rem] p-8 space-y-8 hover:border-gold transition-all group relative overflow-hidden shadow-[0_0_50px_rgba(194,163,93,0.2)]">
-                        <div className="absolute top-4 right-6 bg-gold text-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{t.best}</div>
-                        <div className="space-y-4">
-                            <h3 className="text-2xl font-bold text-white">{t.plan2}</h3>
-                            <p className="text-slate-400 text-sm">{t.plan2Desc}</p>
+                    <div className="relative rounded-lg border border-lab-teal bg-lab-teal p-5 text-white shadow-[0_16px_36px_rgba(8,120,111,0.2)] sm:p-6">
+                        <div className="absolute right-4 top-4 rounded-full bg-white px-3 py-1 text-xs font-extrabold text-lab-teal">{t.best}</div>
+                        <div>
+                            <h3 className="text-xl font-extrabold">{t.plan2}</h3>
+                            <p className="mt-1 text-sm text-white/75">{t.plan2Desc}</p>
                         </div>
-                        <div className="text-4xl font-black text-gold">{t.plan2Price}</div>
+                        <div className="my-6 text-4xl font-extrabold tabular-nums">{t.plan2Price}</div>
                         <button
                             onClick={() => onSelect('plan_large')}
-                            className="w-full py-4 bg-gold text-black rounded-2xl font-bold hover:bg-white transition-all shadow-lg"
+                            className="min-h-12 w-full rounded-md bg-lab-coral px-4 py-3 font-extrabold text-white transition-colors hover:bg-white hover:text-lab-ink"
                         >
                             {t.btn}
                         </button>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-2 text-slate-600 text-[10px] uppercase tracking-[0.3em] font-bold">
+                <div className="mt-5 flex items-center justify-center gap-2 text-xs font-semibold text-lab-ink/55">
                     {t.secure}
                 </div>
             </div>
