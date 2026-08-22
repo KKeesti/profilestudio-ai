@@ -1070,6 +1070,7 @@ app.get('/sitemap.xml', (_req, res) => {
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://shotme.ee/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://shotme.ee/restore</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://shotme.ee/privacy-policy.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
   <url><loc>https://shotme.ee/terms.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
 </urlset>`);
@@ -1088,9 +1089,27 @@ app.use('/assets', express.static(path.join(__dirname, '../dist/assets'), {
 app.use(express.static(path.join(__dirname, '../dist'), {
   maxAge: '1h', dotfiles: 'deny', index: false,
 }));
-const sendApplicationShell = (_req, res) => {
+const applicationShellPath = path.join(__dirname, '../dist/index.html');
+const restoreMeta = (html) => html
+  .replace(/<title>.*?<\/title>/, '<title>ShotMe.ee - Restore an Old Family Photo</title>')
+  .replace(/<meta name="description" content="[^"]*"\s*\/>/, '<meta name="description" content="Remove scratches, recover clarity, and add period-aware color. 10 restorations free, with no email or bank card." />')
+  .replace(/<link rel="canonical" href="[^"]*"\s*\/>/, '<link rel="canonical" href="https://shotme.ee/restore" />')
+  .replace(/<meta property="og:url" content="[^"]*"\s*\/>/, '<meta property="og:url" content="https://shotme.ee/restore" />')
+  .replace(/<meta property="og:title" content="[^"]*"\s*\/>/, '<meta property="og:title" content="Restore an Old Family Photo | ShotMe.ee" />')
+  .replace(/<meta property="og:description" content="[^"]*"\s*\/>/, '<meta property="og:description" content="Remove scratches, recover clarity, and add period-aware color. Try it free without registration." />')
+  .replace(/<meta property="og:image" content="[^"]*"\s*\/>/, '<meta property="og:image" content="https://shotme.ee/demo/restoration-after.webp" />')
+  .replace(/<meta name="twitter:title" content="[^"]*"\s*\/>/, '<meta name="twitter:title" content="Restore an Old Family Photo | ShotMe.ee" />')
+  .replace(/<meta name="twitter:description" content="[^"]*"\s*\/>/, '<meta name="twitter:description" content="Remove scratches, recover clarity, and add period-aware color. Try it free without registration." />')
+  .replace(/<meta name="twitter:image" content="[^"]*"\s*\/>/, '<meta name="twitter:image" content="https://shotme.ee/demo/restoration-after.webp" />');
+
+const sendApplicationShell = (req, res, next) => {
   res.setHeader('Cache-Control', 'no-cache');
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
+  if (req.path !== '/restore') return res.sendFile(applicationShellPath);
+
+  fs.readFile(applicationShellPath, 'utf8', (error, html) => {
+    if (error) return next(error);
+    return res.type('html').send(restoreMeta(html));
+  });
 };
 app.get('/', sendApplicationShell);
 app.get('/*splat', sendApplicationShell);
