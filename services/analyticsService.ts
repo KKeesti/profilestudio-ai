@@ -3,6 +3,8 @@ import { AppStep, Language, PhotoStyle } from '../types';
 export type FunnelEvent =
   | 'page_view'
   | 'screen_view'
+  | 'cta_impression'
+  | 'scroll_depth'
   | 'upload_cta_clicked'
   | 'photo_selected'
   | 'style_selected'
@@ -23,6 +25,7 @@ type FunnelProperties = {
   style?: PhotoStyle;
   reason?: 'credits' | 'rate_limit' | 'invalid_image' | 'network' | 'provider' | 'unknown';
   plan?: string;
+  depth?: 25 | 50 | 75 | 100;
 };
 
 const STEP_NAMES: Partial<Record<AppStep, string>> = {
@@ -42,14 +45,15 @@ function getDevice() {
 function getAttribution() {
   const key = 'shotme_attribution';
   try {
-    const existing = sessionStorage.getItem(key);
-    if (existing) return JSON.parse(existing);
     const params = new URLSearchParams(window.location.search);
-    const attribution = {
+    const existing = JSON.parse(sessionStorage.getItem(key) || '{}');
+    const current = Object.fromEntries(Object.entries({
       source: params.get('utm_source') || undefined,
       medium: params.get('utm_medium') || undefined,
       campaign: params.get('utm_campaign') || undefined,
-    };
+      content: params.get('utm_content') || undefined,
+    }).filter(([, value]) => Boolean(value)));
+    const attribution = { ...existing, ...current };
     sessionStorage.setItem(key, JSON.stringify(attribution));
     return attribution;
   } catch {
@@ -76,7 +80,11 @@ export function trackFunnel(event: FunnelEvent, properties: FunnelProperties = {
     style: properties.style,
     reason: properties.reason,
     plan: properties.plan,
+    depth: properties.depth,
     device: getDevice(),
+    surface: window.location.pathname.replace(/\/+$/, '') === '/restore' || new URLSearchParams(window.location.search).get('mode') === 'restore'
+      ? 'restore'
+      : 'studio',
     ...getAttribution(),
   });
 

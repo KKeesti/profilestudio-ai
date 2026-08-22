@@ -4,6 +4,7 @@ import { TRANSLATIONS } from '../translations';
 
 interface HeaderProps {
   language: Language;
+  mode?: 'studio' | 'restore';
   credits?: number;
   hasGallery?: boolean;
   onBuyCredits?: () => void;
@@ -23,6 +24,7 @@ const SIGN_OUT: Record<Language, string> = {
 
 const Header: React.FC<HeaderProps> = ({
   language,
+  mode = 'studio',
   credits = 0,
   hasGallery = false,
   onBuyCredits,
@@ -77,18 +79,31 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <div className="hidden sm:inline-block mt-12 mb-4">
-        <span className="text-[10px] text-gold uppercase tracking-[0.5em] font-bold border-x border-gold/30 px-6 py-1">
-          {t.exclusiveAccess}
-        </span>
-      </div>
+      {mode === 'restore' ? (
+        <>
+          <h1 className="mt-14 sm:mt-12 text-3xl sm:text-4xl font-serif text-white mb-1">
+            ShotMe<span className="text-gold">.ee</span>
+          </h1>
+          <p className="hidden sm:block text-slate-400 text-sm mb-4 max-w-md mx-auto leading-relaxed">
+            {t.restoreHeaderTagline}
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="hidden sm:inline-block mt-12 mb-4">
+            <span className="text-[10px] text-gold uppercase tracking-[0.5em] font-bold border-x border-gold/30 px-6 py-1">
+              {t.exclusiveAccess}
+            </span>
+          </div>
 
-      <h1 className="mt-12 sm:mt-0 text-4xl sm:text-5xl md:text-7xl font-serif text-white mb-2 sm:mb-4">
-        Profile <span className="text-gold italic font-light">Studio</span>
-      </h1>
-      <p className="hidden sm:block text-slate-500 font-light text-[11px] tracking-[0.25em] uppercase mb-6 max-w-md mx-auto leading-relaxed">
-        {t.highEndPhotography}
-      </p>
+          <h1 className="mt-12 sm:mt-0 text-4xl sm:text-5xl md:text-7xl font-serif text-white mb-2 sm:mb-4">
+            Profile <span className="text-gold italic font-light">Studio</span>
+          </h1>
+          <p className="hidden sm:block text-slate-500 font-light text-[11px] tracking-[0.25em] uppercase mb-6 max-w-md mx-auto leading-relaxed">
+            {t.highEndPhotography}
+          </p>
+        </>
+      )}
     </header>
   );
 };

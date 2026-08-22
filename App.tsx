@@ -11,6 +11,12 @@ import { classifyFunnelError, trackFunnel } from './services/analyticsService';
 
 const FREE_TRIAL_LIMIT = 10;
 
+const isRestoreEntryPoint = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.replace(/\/+$/, '');
+  return path === '/restore' || new URLSearchParams(window.location.search).get('mode') === 'restore';
+};
+
 const detectBrowserLanguage = (): Language => {
   if (typeof navigator === 'undefined') return Language.EN;
   const browserLanguages = navigator.languages?.length ? navigator.languages : [navigator.language];
@@ -36,6 +42,7 @@ const getStoredFreeGenerationsUsed = () => {
 };
 
 const App: React.FC = () => {
+  const [isRestoreMode] = useState(isRestoreEntryPoint);
   const [language, setLanguage] = useState<Language>(() => detectBrowserLanguage());
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -69,6 +76,8 @@ const App: React.FC = () => {
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancel' | null>(null);
   const [showAnimatePaywall, setShowAnimatePaywall] = useState(false);
   const [generationError, setGenerationError] = useState<'restricted' | 'unavailable' | null>(null);
+  const [restoreDemoAfter, setRestoreDemoAfter] = useState(true);
+  const [isUploadDragging, setIsUploadDragging] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -76,11 +85,55 @@ const App: React.FC = () => {
   const recordingStreamRef = useRef<MediaStream | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadCtaRef = useRef<HTMLButtonElement>(null);
+  const ctaImpressionTrackedRef = useRef(false);
+  const scrollDepthsTrackedRef = useRef<Set<number>>(new Set());
   const freeCreditsLeft = Math.max(0, FREE_TRIAL_LIMIT - freeGenerationsUsed);
   const premiumFeaturesEnabled = Boolean(userEmail && hasGallery);
 
   useEffect(() => {
     trackFunnel('page_view', { language, screen: AppStep.UPLOAD });
+  }, []);
+
+  useEffect(() => {
+    const t = TRANSLATIONS[language];
+    document.documentElement.lang = language;
+    document.title = isRestoreMode
+      ? `ShotMe.ee - ${t.restoreLandingTitle}`
+      : 'ShotMe.ee - AI Photo Studio';
+  }, [isRestoreMode, language]);
+
+  useEffect(() => {
+    if (step !== AppStep.UPLOAD || ctaImpressionTrackedRef.current || !uploadCtaRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      ctaImpressionTrackedRef.current = true;
+      trackFunnel('cta_impression', { language, screen: AppStep.UPLOAD });
+      observer.disconnect();
+    }, { threshold: 0.6 });
+    observer.observe(uploadCtaRef.current);
+    return () => observer.disconnect();
+  }, [language, step]);
+
+  useEffect(() => {
+    const thresholds = [25, 50, 75, 100] as const;
+    const recordScrollDepth = () => {
+      const pageHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+      const reached = Math.min(100, Math.round(((window.scrollY + window.innerHeight) / pageHeight) * 100));
+      thresholds.forEach((depth) => {
+        if (reached >= depth && !scrollDepthsTrackedRef.current.has(depth)) {
+          scrollDepthsTrackedRef.current.add(depth);
+          trackFunnel('scroll_depth', { language, screen: step, depth });
+        }
+      });
+    };
+    recordScrollDepth();
+    window.addEventListener('scroll', recordScrollDepth, { passive: true });
+    window.addEventListener('resize', recordScrollDepth);
+    return () => {
+      window.removeEventListener('scroll', recordScrollDepth);
+      window.removeEventListener('resize', recordScrollDepth);
+    };
   }, []);
 
   useEffect(() => {
@@ -171,25 +224,8 @@ const App: React.FC = () => {
     localStorage.setItem('ps_free_generations_used', freeGenerationsUsed.toString());
   }, [freeGenerationsUsed]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.currentTarget;
-    const file = input.files?.[0];
-    if (file) {
-      trackFunnel('photo_selected', { language, screen: step });
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setOriginalImage(event.target?.result as string);
-        setResultImage(null);
-        setShowOriginal(false);
-        setStep(AppStep.CHOOSE_STYLE);
-      };
-      reader.readAsDataURL(file);
-      input.value = '';
-    }
-  };
-
-  const handleGenerate = async (style: PhotoStyle) => {
-    if (!originalImage) return;
+  const handleGenerate = async (style: PhotoStyle, sourceImage = originalImage) => {
+    if (!sourceImage) return;
 
     const activeEmail = userEmail;
     const isAnonymousFreeGeneration = !activeEmail;
@@ -234,8 +270,8 @@ const App: React.FC = () => {
     setProcessing({ isProcessing: true, status: statusMap[style] });
 
     try {
-      const base64Data = originalImage.split(',')[1];
-      const mimeType = originalImage.split(';')[0].split(':')[1];
+      const base64Data = sourceImage.split(',')[1];
+      const mimeType = sourceImage.split(';')[0].split(':')[1];
       const promptToSend = canUsePremiumDetails ? customPrompt : '';
       const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, promptToSend);
       setResultImage(res);
@@ -258,6 +294,41 @@ const App: React.FC = () => {
     } finally {
       setProcessing({ isProcessing: false, status: '' });
     }
+  };
+
+  const processImageFile = (file: File) => {
+    trackFunnel('photo_selected', { language, screen: step });
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageData = event.target?.result as string;
+      setOriginalImage(imageData);
+      setResultImage(null);
+      setShowOriginal(false);
+
+      if (isRestoreMode) {
+        setSelectedStyle(PhotoStyle.RESTORE_OLD_PHOTO);
+        trackFunnel('style_selected', { language, screen: AppStep.UPLOAD, style: PhotoStyle.RESTORE_OLD_PHOTO });
+        void handleGenerate(PhotoStyle.RESTORE_OLD_PHOTO, imageData);
+        return;
+      }
+
+      setStep(AppStep.CHOOSE_STYLE);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    if (file) processImageFile(file);
+    input.value = '';
+  };
+
+  const handleImageDrop = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    setIsUploadDragging(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file?.type.startsWith('image/')) processImageFile(file);
   };
 
   const handleRefine = async () => {
@@ -318,7 +389,7 @@ const App: React.FC = () => {
   const handleDownload = () => {
     if (!resultImage) return;
     trackFunnel('result_downloaded', { language, screen: AppStep.RESULT, style: selectedStyle || undefined });
-    downloadDataUrl(resultImage, 'profile-studio-ai-portrait.jpg');
+    downloadDataUrl(resultImage, isRestoreMode ? 'shotme-restored-photo.jpg' : 'profile-studio-ai-portrait.jpg');
   };
 
   const handleAnimatePhotoClick = () => {
@@ -497,6 +568,100 @@ const App: React.FC = () => {
         );
 
       case AppStep.UPLOAD:
+        if (isRestoreMode) {
+          return (
+            <section className="mx-auto flex w-full max-w-3xl flex-col items-center animate-in fade-in duration-500">
+              <div className="max-w-2xl text-center">
+                <h2 className="text-balance font-serif text-4xl leading-[1.08] text-white sm:text-5xl lg:text-6xl">
+                  {t.restoreLandingTitle}
+                </h2>
+                <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
+                  {t.restoreLandingDesc}
+                </p>
+              </div>
+
+              <button
+                ref={uploadCtaRef}
+                type="button"
+                onClick={() => {
+                  trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
+                  fileInputRef.current?.click();
+                }}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setIsUploadDragging(true);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={() => setIsUploadDragging(false)}
+                onDrop={handleImageDrop}
+                className={`mt-7 flex min-h-20 w-full max-w-xl flex-col items-center justify-center gap-1 rounded-2xl border px-6 py-4 text-black shadow-[0_18px_44px_rgba(194,163,93,0.28)] transition-all focus:outline-none focus:ring-4 focus:ring-gold/30 active:scale-[0.99] ${isUploadDragging ? 'border-white bg-white' : 'border-gold bg-gold hover:border-white hover:bg-white'}`}
+              >
+                <span className="flex items-center justify-center gap-3 text-base font-black sm:text-lg">
+                  <ICONS.Camera /> {t.restoreLandingCta}
+                </span>
+                <span className="hidden text-xs font-semibold text-black/60 sm:block">{t.restoreDropHint}</span>
+              </button>
+              <p className="mt-3 text-center text-sm font-bold text-white">{t.restoreLandingFree}</p>
+
+              <div className="mt-7 w-full max-w-xl border-y border-white/10 text-left">
+                {[t.restoreTrustFace, t.restoreTrustOriginal, t.restoreTrustPreview].map((promise, index) => (
+                  <div key={promise} className={`flex min-h-12 items-center gap-3 py-3 text-sm leading-5 text-slate-300 ${index > 0 ? 'border-t border-white/10' : ''}`}>
+                    <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-gold/70">
+                      <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+                    </span>
+                    <span>{promise}</span>
+                  </div>
+                ))}
+              </div>
+
+              <figure className="mt-12 w-full max-w-xl">
+                <h3 className="mb-4 text-center font-serif text-2xl text-white sm:text-3xl">{t.restoreExampleTitle}</h3>
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#111419] shadow-2xl">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-black">
+                    <img
+                      src={restoreDemoAfter ? '/demo/restoration-after.webp' : '/demo/restoration-before.webp'}
+                      alt={restoreDemoAfter ? t.demoAfter : t.demoBefore}
+                      className="h-full w-full object-cover object-top"
+                    />
+                    <span className={`absolute bottom-3 left-3 rounded-md px-3 py-1.5 text-xs font-bold uppercase ${restoreDemoAfter ? 'bg-gold text-black' : 'bg-black/80 text-white'}`}>
+                      {restoreDemoAfter ? t.demoAfter : t.demoBefore}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 p-3 sm:p-4">
+                    <div className="grid flex-1 grid-cols-2 rounded-xl bg-black/50 p-1" role="group" aria-label={`${t.demoBefore} / ${t.demoAfter}`}>
+                      <button
+                        type="button"
+                        onClick={() => setRestoreDemoAfter(false)}
+                        aria-pressed={!restoreDemoAfter}
+                        className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${!restoreDemoAfter ? 'bg-white text-black' : 'text-slate-300 hover:text-white'}`}
+                      >
+                        {t.demoBefore}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRestoreDemoAfter(true)}
+                        aria-pressed={restoreDemoAfter}
+                        className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${restoreDemoAfter ? 'bg-gold text-black' : 'text-slate-300 hover:text-white'}`}
+                      >
+                        {t.demoAfter}
+                      </button>
+                    </div>
+                    <a
+                      href="https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 text-xs text-slate-400 underline decoration-slate-600 underline-offset-4 hover:text-white"
+                    >
+                      {t.demoSource}
+                    </a>
+                  </div>
+                </div>
+                <figcaption className="px-2 pt-3 text-center text-xs leading-5 text-slate-400">{t.demoCaption}</figcaption>
+              </figure>
+            </section>
+          );
+        }
+
         return (
           <section className="max-w-2xl mx-auto flex flex-col items-center animate-in fade-in zoom-in-95 duration-500">
             <div className="text-center mb-4 sm:mb-6">
@@ -530,6 +695,7 @@ const App: React.FC = () => {
             </figure>
 
             <button
+              ref={uploadCtaRef}
               type="button"
               onClick={() => {
                 trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
@@ -889,6 +1055,7 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col pb-24 bg-dark font-sans selection:bg-gold selection:text-black scroll-smooth">
       <Header
         language={language}
+        mode={isRestoreMode ? 'restore' : 'studio'}
         credits={userEmail ? credits : freeCreditsLeft}
         userEmail={userEmail}
         hasGallery={hasGallery}
