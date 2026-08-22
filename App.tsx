@@ -671,6 +671,19 @@ const App: React.FC = () => {
               <p className="text-slate-400 text-sm sm:text-base max-w-lg mx-auto mt-2 leading-relaxed">{t.uploadDesc}</p>
             </div>
 
+            <button
+              ref={uploadCtaRef}
+              type="button"
+              onClick={() => {
+                trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
+                fileInputRef.current?.click();
+              }}
+              className="group mb-3 w-full max-w-md min-h-14 rounded-2xl bg-gold px-6 py-4 text-lg font-black text-black shadow-[0_16px_40px_rgba(194,163,93,0.3)] transition-all hover:bg-white active:scale-[0.98] flex items-center justify-center gap-3"
+            >
+              {t.startBtn} <ICONS.Magic />
+            </button>
+            <p className="mb-5 text-center text-xs font-semibold text-slate-300">{t.freeNoSignup}</p>
+
             <figure className="w-full max-w-md">
               <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 shadow-2xl">
                 <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-black">
@@ -694,19 +707,6 @@ const App: React.FC = () => {
                 </a>
               </figcaption>
             </figure>
-
-            <button
-              ref={uploadCtaRef}
-              type="button"
-              onClick={() => {
-                trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
-                fileInputRef.current?.click();
-              }}
-              className="group mt-4 sm:mt-6 w-full max-w-md min-h-14 rounded-2xl bg-gold px-6 py-4 text-lg font-black text-black shadow-[0_16px_40px_rgba(194,163,93,0.3)] transition-all hover:bg-white active:scale-[0.98] flex items-center justify-center gap-3"
-            >
-              {t.startBtn} <ICONS.Magic />
-            </button>
-            <p className="mt-2 text-center text-xs font-semibold text-slate-400">{t.freeNoSignup}</p>
             <p className="mt-3 hidden sm:block text-center text-[11px] text-slate-600">{t.howItWorks}</p>
           </section>
         );
