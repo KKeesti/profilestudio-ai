@@ -227,6 +227,7 @@ const App: React.FC = () => {
   const handleGenerate = async (style: PhotoStyle, sourceImage = originalImage) => {
     if (!sourceImage) return;
 
+    const generationEntryScreen = isRestoreMode ? AppStep.UPLOAD : AppStep.CHOOSE_STYLE;
     const activeEmail = userEmail;
     const isAnonymousFreeGeneration = !activeEmail;
     let currentCredits = Number(credits);
@@ -234,7 +235,7 @@ const App: React.FC = () => {
 
     if (isAnonymousFreeGeneration) {
       if (freeCreditsLeft <= 0) {
-        trackFunnel('email_gate_opened', { language, screen: AppStep.CHOOSE_STYLE });
+        trackFunnel('email_gate_opened', { language, screen: generationEntryScreen });
         setShowEmailModalForGenerate(true);
         return;
       }
@@ -252,7 +253,7 @@ const App: React.FC = () => {
       }
 
       if (currentCredits <= 0) {
-        trackFunnel('payment_opened', { language, screen: AppStep.CHOOSE_STYLE });
+        trackFunnel('payment_opened', { language, screen: generationEntryScreen });
         setShowPaymentModal(true);
         return;
       }
@@ -266,7 +267,7 @@ const App: React.FC = () => {
       [PhotoStyle.BUSINESS_LUXE]: t.processingBusiness,
     };
 
-    trackFunnel('generation_started', { language, screen: AppStep.CHOOSE_STYLE, style });
+    trackFunnel('generation_started', { language, screen: generationEntryScreen, style });
     setProcessing({ isProcessing: true, status: statusMap[style] });
 
     try {
@@ -284,7 +285,7 @@ const App: React.FC = () => {
         setFreeGenerationsUsed(prev => Math.min(FREE_TRIAL_LIMIT, prev + 1));
       }
     } catch (error: any) {
-      trackFunnel('generation_failed', { language, screen: AppStep.CHOOSE_STYLE, style, reason: classifyFunnelError(error) });
+      trackFunnel('generation_failed', { language, screen: generationEntryScreen, style, reason: classifyFunnelError(error) });
       console.error("Generation error:", error);
       if (error.message === 'OUT_OF_CREDITS') {
         setShowPaymentModal(true);

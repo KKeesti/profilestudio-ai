@@ -35,6 +35,8 @@ const STEP_NAMES: Partial<Record<AppStep, string>> = {
   [AppStep.HISTORY]: 'history',
 };
 
+let inMemoryAnalyticsVisitorId: string | undefined;
+
 function getDevice() {
   const width = window.innerWidth;
   if (width < 640) return 'mobile';
@@ -43,18 +45,22 @@ function getDevice() {
 }
 
 function getAnalyticsVisitorId() {
+  if (inMemoryAnalyticsVisitorId) return inMemoryAnalyticsVisitorId;
   const key = 'shotme_analytics_visitor';
   try {
     const existing = localStorage.getItem(key);
-    if (existing) return existing;
-    const visitorId = typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
+    if (existing) inMemoryAnalyticsVisitorId = existing;
+  } catch {}
+
+  if (!inMemoryAnalyticsVisitorId) {
+    inMemoryAnalyticsVisitorId = typeof globalThis.crypto?.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-    localStorage.setItem(key, visitorId);
-    return visitorId;
-  } catch {
-    return undefined;
+    try {
+      localStorage.setItem(key, inMemoryAnalyticsVisitorId);
+    } catch {}
   }
+  return inMemoryAnalyticsVisitorId;
 }
 
 function getAttribution() {
