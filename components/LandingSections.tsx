@@ -13,7 +13,6 @@ interface LandingSectionsProps {
 
 const SOURCE_LINKS = {
   restoreMain: 'https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg',
-  restoreFamily: 'https://commons.wikimedia.org/wiki/File:1895_Boston_family_portrait.jpg',
 };
 
 const GENERATIONS: Record<Language, string> = {
@@ -47,10 +46,9 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
       objectPosition: 'center top',
     },
     {
-      before: '/examples/restore-family-1895-before.webp',
-      after: '/examples/restore-family-1895-after.webp',
+      before: '/examples/restore-family-1930-before.png',
+      after: '/examples/restore-family-1930-after.png',
       title: copy.restoreExamples[1],
-      source: SOURCE_LINKS.restoreFamily,
       objectPosition: 'center',
     },
     {
