@@ -24,8 +24,7 @@ The product should feel like a modern, careful photo lab rather than a luxury fa
 | White | `#ffffff` | Controls and content surfaces |
 | Ink | `#15302b` | Primary text and dark hero areas |
 | Teal | `#08786f` | Restoration, trust, selected states |
-| Coral | `#f06449` | Primary upload and download actions |
-| Blue | `#365aa5` | Portrait studio and utility actions |
+| Coral | `#f1694f` | Primary upload and download actions; 4.61:1 contrast with Ink |
 | Mist | `#dfe9e5` | Secondary surfaces and status backgrounds |
 | Line | `#c7d6d1` | Borders and dividers |
 
@@ -47,10 +46,9 @@ Use opaque colors. Gradients and decorative color blobs are not part of this sys
 
 ## Action Hierarchy
 
-1. Coral: upload, restore, download.
-2. Teal: selected restoration mode and trust confirmation.
-3. Blue: portrait studio mode and related utilities.
-4. White with border: secondary actions such as replace image, show original, and go back.
+1. Coral with ink text: upload, restore, download. Use white text only after the background changes to ink.
+2. Teal: selected modes, navigation state, and trust confirmation.
+3. White with border: secondary actions such as replace image, show original, and go back.
 
 All primary touch targets should be at least 48px high. Icon-only controls require an accessible name and tooltip where their meaning is not universal.
 
@@ -78,3 +76,13 @@ All primary touch targets should be at least 48px high. Icon-only controls requi
 - Use “10 free” and “no email or bank card” near the first action.
 - Never claim exact identity preservation as a guarantee; describe it as the product goal.
 - Keep all six supported languages aligned in meaning and action order.
+
+## Landing Page Structure
+
+- The main route sells one result: a professional portrait from one selfie.
+- `/restore` sells one result: careful restoration and optional period-aware colorization.
+- Each hero pairs a single coral upload action with a draggable, labelled before/after example.
+- Mode cards use neutral surfaces and real result previews. Selection is shown with a teal border and checkmark.
+- Evidence follows the hero in this order: real examples, three-step process, visible one-time pricing, privacy, FAQ, and a final upload action.
+- Example captions identify the task and link to the original source when one is available.
+- The footer exposes both product routes, pricing, help, legal pages, and the operating company.

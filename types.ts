@@ -5,7 +5,6 @@ export interface ProcessingState {
 }
 
 export enum AppStep {
-  LANGUAGE_SELECT = 'LANGUAGE_SELECT',
   UPLOAD = 'UPLOAD',
   CHOOSE_STYLE = 'CHOOSE_STYLE',
   RESULT = 'RESULT',

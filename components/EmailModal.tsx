@@ -148,7 +148,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-14 w-full rounded-md bg-lab-coral px-5 py-4 text-base font-extrabold text-white transition-colors hover:bg-lab-ink disabled:cursor-wait disabled:opacity-60"
+              className="min-h-14 w-full rounded-md bg-lab-coral px-5 py-4 text-base font-extrabold text-lab-ink transition-colors hover:bg-lab-ink hover:text-white disabled:cursor-wait disabled:opacity-60"
             >
               {submitting ? authText.sending : authText.submit}
             </button>

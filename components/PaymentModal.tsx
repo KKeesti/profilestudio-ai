@@ -155,7 +155,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, onClose, language
                         <div className="my-6 text-4xl font-extrabold tabular-nums">{t.plan2Price}</div>
                         <button
                             onClick={() => onSelect('plan_large')}
-                            className="min-h-12 w-full rounded-md bg-lab-coral px-4 py-3 font-extrabold text-white transition-colors hover:bg-white hover:text-lab-ink"
+                            className="min-h-12 w-full rounded-md bg-lab-coral px-4 py-3 font-extrabold text-lab-ink transition-colors hover:bg-white"
                         >
                             {t.btn}
                         </button>

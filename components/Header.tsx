@@ -7,6 +7,7 @@ interface HeaderProps {
   onLanguageChange?: (language: Language) => void;
   mode?: 'studio' | 'restore';
   credits?: number;
+  showCredits?: boolean;
   hasGallery?: boolean;
   onBuyCredits?: () => void;
   onViewHistory?: () => void;
@@ -28,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({
   onLanguageChange,
   mode = 'studio',
   credits = 0,
+  showCredits = false,
   hasGallery = false,
   onBuyCredits,
   onViewHistory,
@@ -51,18 +53,18 @@ const Header: React.FC<HeaderProps> = ({
           ShotMe<span className="text-lab-coral">.ee</span>
         </a>
 
-        <nav className="ml-2 hidden items-center gap-1 border-l border-lab-line pl-3 md:flex" aria-label="Photo modes">
+        <nav className="ml-5 hidden items-center gap-6 md:flex" aria-label="Photo modes">
           <a
             href="/restore"
             aria-current={mode === 'restore' ? 'page' : undefined}
-            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${mode === 'restore' ? 'bg-lab-teal text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
+            className={`border-b-2 py-2 text-sm font-semibold transition-colors ${mode === 'restore' ? 'border-lab-teal text-lab-ink' : 'border-transparent text-lab-ink/65 hover:text-lab-ink'}`}
           >
             {t.restoreOldPhoto}
           </a>
           <a
             href="/"
             aria-current={mode === 'studio' ? 'page' : undefined}
-            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${mode === 'studio' ? 'bg-lab-blue text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
+            className={`border-b-2 py-2 text-sm font-semibold transition-colors ${mode === 'studio' ? 'border-lab-teal text-lab-ink' : 'border-transparent text-lab-ink/65 hover:text-lab-ink'}`}
           >
             {t.uploadTitle}
           </a>
@@ -79,27 +81,33 @@ const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <span className="whitespace-nowrap rounded-full bg-lab-mist px-3 py-2 text-xs font-bold tabular-nums text-lab-ink">
-            <span className="hidden sm:inline">{userEmail ? t.creditsLeft : (t.freeCredits || t.creditsLeft)}: </span>{credits}
-          </span>
+          {showCredits && (
+            <span className="whitespace-nowrap rounded-full bg-lab-mist px-3 py-2 text-xs font-bold tabular-nums text-lab-ink">
+              <span className="hidden sm:inline">{userEmail ? t.creditsLeft : (t.freeCredits || t.creditsLeft)}: </span>{credits}
+            </span>
+          )}
 
           {userEmail && onBuyCredits && (
             <button
               type="button"
               onClick={onBuyCredits}
-              className="rounded-md bg-lab-coral px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-lab-ink sm:text-sm"
+              className="rounded-md bg-lab-coral px-3 py-2 text-xs font-bold text-lab-ink transition-colors hover:bg-lab-ink hover:text-white sm:text-sm"
             >
               {t.buyCredits}
             </button>
           )}
 
           {onLanguageChange && (
-            <label className="relative">
+            <label className="relative flex items-center gap-1.5 text-lab-ink/65 hover:text-lab-ink">
               <span className="sr-only">{t.selectLanguage}</span>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+                <path d="M3.5 12h17M12 3c2.2 2.45 3.35 5.45 3.35 9S14.2 18.55 12 21M12 3c-2.2 2.45-3.35 5.45-3.35 9S9.8 18.55 12 21" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
               <select
                 value={language}
                 onChange={(event) => onLanguageChange(event.target.value as Language)}
-                className="h-9 cursor-pointer rounded-md border border-lab-line bg-white px-2 text-xs font-bold text-lab-ink"
+                className="language-select h-9 cursor-pointer border-0 bg-transparent px-0 text-xs font-bold text-lab-ink outline-none"
                 aria-label={t.selectLanguage}
               >
                 {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -120,9 +128,9 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <nav className="flex border-t border-lab-line px-4 py-2 md:hidden" aria-label="Photo modes mobile">
-        <a href="/restore" className={`flex-1 rounded-md px-2 py-2 text-center text-xs font-bold ${mode === 'restore' ? 'bg-lab-teal text-white' : 'text-lab-ink'}`}>{t.restoreOldPhoto}</a>
-        <a href="/" className={`flex-1 rounded-md px-2 py-2 text-center text-xs font-bold ${mode === 'studio' ? 'bg-lab-blue text-white' : 'text-lab-ink'}`}>{t.uploadTitle}</a>
+      <nav className="flex border-t border-lab-line px-4 md:hidden" aria-label="Photo modes mobile">
+        <a href="/restore" className={`flex-1 border-b-2 px-2 py-3 text-center text-xs font-bold ${mode === 'restore' ? 'border-lab-teal text-lab-ink' : 'border-transparent text-lab-ink/60'}`}>{t.restoreOldPhoto}</a>
+        <a href="/" className={`flex-1 border-b-2 px-2 py-3 text-center text-xs font-bold ${mode === 'studio' ? 'border-lab-teal text-lab-ink' : 'border-transparent text-lab-ink/60'}`}>{t.uploadTitle}</a>
       </nav>
     </header>
   );

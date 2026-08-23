@@ -4,9 +4,12 @@ import { AppStep, ProcessingState, PhotoStyle, AspectRatio, Language } from './t
 import Header from './components/Header';
 import EmailModal from './components/EmailModal';
 import PaymentModal from './components/PaymentModal';
+import BeforeAfter from './components/BeforeAfter';
+import LandingSections from './components/LandingSections';
 import { GeminiService } from './services/geminiService';
 import { ICONS } from './constants';
 import { TRANSLATIONS } from './translations';
+import { LANDING_CONTENT } from './landingContent';
 import { classifyFunnelError, trackFunnel } from './services/analyticsService';
 
 const FREE_TRIAL_LIMIT = 10;
@@ -48,12 +51,10 @@ const App: React.FC = () => {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
-  const [selectedStyle, setSelectedStyle] = useState<PhotoStyle | null>(PhotoStyle.CLASSIC_STUDIO);
+  const [selectedStyle, setSelectedStyle] = useState<PhotoStyle | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [correctionRequest, setCorrectionRequest] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
-  const [isConsentChecked, setIsConsentChecked] = useState(() => localStorage.getItem('ps_consent') === 'true');
-  const [showConsentHint, setShowConsentHint] = useState(false);
   const [hasGallery, setHasGallery] = useState(false);
   const [showEmailModalForGenerate, setShowEmailModalForGenerate] = useState(false);
   const [freeGenerationsUsed, setFreeGenerationsUsed] = useState(getStoredFreeGenerationsUsed);
@@ -76,7 +77,6 @@ const App: React.FC = () => {
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancel' | null>(null);
   const [showAnimatePaywall, setShowAnimatePaywall] = useState(false);
   const [generationError, setGenerationError] = useState<'restricted' | 'unavailable' | null>(null);
-  const [restoreDemoAfter, setRestoreDemoAfter] = useState(true);
   const [isUploadDragging, setIsUploadDragging] = useState(false);
   const [pendingUploadStyle, setPendingUploadStyle] = useState<PhotoStyle | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -312,7 +312,7 @@ const App: React.FC = () => {
       setShowOriginal(false);
 
       const immediateStyle = isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : pendingUploadStyle;
-      if (immediateStyle && !premiumFeaturesEnabled) {
+      if (immediateStyle && (isRestoreMode || !premiumFeaturesEnabled)) {
         setSelectedStyle(immediateStyle);
         setPendingUploadStyle(null);
         trackFunnel('style_selected', { language, screen: AppStep.UPLOAD, style: immediateStyle });
@@ -486,6 +486,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     const t = TRANSLATIONS[language];
+    const landing = LANDING_CONTENT[language];
     const QUICK_TAGS = [
       t.forTinder,
       t.instaStyle,
@@ -496,205 +497,84 @@ const App: React.FC = () => {
       t.cinematic,
       t.naturalLook
     ];
+    const openUpload = (style: PhotoStyle | null = null) => {
+      setPendingUploadStyle(style);
+      trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD, style: style || undefined });
+      fileInputRef.current?.click();
+    };
 
     switch (step) {
-      case AppStep.LANGUAGE_SELECT:
-        return (
-          <div className="max-w-2xl mx-auto py-20 px-8 bg-white/5 border border-white/10 rounded-[3rem] flex flex-col items-center gap-12 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-5xl font-serif text-white italic">ProfileStudio AI</h2>
-              <p className="text-slate-400 max-w-sm mx-auto leading-relaxed">
-                Select your language / Valige keel / Выберите язык
-              </p>
-            </div>
-            
-            <div
-              className={`relative w-full max-w-lg mx-auto flex items-start gap-4 text-left p-5 sm:p-6 rounded-[1.75rem] border transition-all duration-300 ${showConsentHint ? 'bg-red-500/10 border-red-400/80 shadow-[0_0_0_3px_rgba(248,113,113,0.22),0_0_34px_rgba(248,113,113,0.24)] animate-pulse' : 'bg-black/25 border-white/10'}`}
-            >
-              {showConsentHint && (
-                <div className="absolute -top-4 left-6 rounded-full bg-red-500 px-4 py-1.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg">
-                  {t.consentHint || 'Tick this box to continue'}
-                </div>
-              )}
-              <input
-                type="checkbox"
-                id="consentCheck"
-                checked={isConsentChecked}
-                aria-invalid={showConsentHint && !isConsentChecked}
-                aria-describedby={showConsentHint ? 'consentHint' : undefined}
-                onChange={(e) => {
-                  setIsConsentChecked(e.target.checked);
-                  if (e.target.checked) {
-                    setShowConsentHint(false);
-                    localStorage.setItem('ps_consent', 'true');
-                  } else {
-                    localStorage.removeItem('ps_consent');
-                  }
-                }}
-                className={`mt-1 h-8 w-8 shrink-0 rounded-lg border-2 bg-black/70 accent-[#c2a35d] cursor-pointer transition-all focus:outline-none focus:ring-4 ${showConsentHint ? 'border-red-400 ring-4 ring-red-400/30' : 'border-white/50 focus:ring-gold/35'}`}
-              />
-              <div className="space-y-2">
-                <label htmlFor="consentCheck" className="block text-sm sm:text-[13px] text-slate-300 leading-6 cursor-pointer select-none">
-                  {t.consentText || "I agree to the Terms of Use and"} <a href="/terms.html" target="_blank" className="text-gold hover:underline">Terms of Use</a> / <a href="/privacy-policy.html" target="_blank" className="text-gold hover:underline">{t.privacyPolicyLink || "Privacy Policy"}</a>.
-                </label>
-                {showConsentHint && !isConsentChecked && (
-                  <p id="consentHint" className="text-sm font-bold text-red-200">
-                    {t.consentHint || 'Tick this box to continue'}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
-              {[
-                { id: Language.EN, label: 'English', flag: '🇺🇸' },
-                { id: Language.ET, label: 'Eesti', flag: '🇪🇪' },
-                { id: Language.RU, label: 'Русский', flag: '🇷🇺' },
-                { id: Language.LV, label: 'Latviešu', flag: '🇱🇻' },
-                { id: Language.LT, label: 'Lietuvių', flag: '🇱🇹' },
-                { id: Language.FI, label: 'Suomi', flag: '🇫🇮' }
-              ].map(lang => (
-                <button
-                  key={lang.id}
-                  type="button"
-                  onClick={() => {
-                    if (!isConsentChecked) {
-                      setShowConsentHint(true);
-                      window.setTimeout(() => document.getElementById('consentCheck')?.focus(), 0);
-                      return;
-                    }
-                    setShowConsentHint(false);
-                    setLanguage(lang.id);
-                    setStep(AppStep.UPLOAD);
-                  }}
-                  className="group px-6 py-8 bg-white/5 hover:bg-gold text-white hover:text-black rounded-[2rem] font-bold text-xl transition-all transform hover:-translate-y-1 border border-white/10 flex flex-col items-center gap-3 active:scale-95"
-                >
-                  <span className="text-4xl">{lang.flag}</span>
-                  {lang.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
       case AppStep.UPLOAD:
         return (
-          <div className="mx-auto w-full max-w-[1200px] animate-in fade-in duration-500">
-            <section className="overflow-hidden rounded-lg bg-lab-ink text-white">
-              <div className="grid lg:min-h-[620px] lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="order-2 flex flex-col justify-center px-4 py-4 min-[360px]:px-6 min-[360px]:py-8 sm:px-10 lg:order-none lg:px-14 lg:py-16">
-                  <h1 className="max-w-xl text-[28px] font-extrabold leading-[1.04] tracking-[-0.03em] min-[360px]:text-4xl sm:text-5xl lg:text-6xl">
-                    {isRestoreMode ? t.restoreLandingTitle : (t.homeHeroTitle || t.uploadTitle)}
+          <div className="w-full animate-in fade-in duration-500">
+            <section className="bg-lab-ink text-white">
+              <div className="mx-auto grid max-w-[1200px] lg:min-h-[640px] lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="order-2 flex flex-col justify-center px-4 py-5 min-[360px]:px-6 min-[360px]:py-9 sm:px-10 lg:order-none lg:px-14 lg:py-16">
+                  <h1 className="max-w-[16ch] text-balance text-[28px] font-extrabold leading-[1.05] tracking-[-0.03em] min-[360px]:text-4xl sm:max-w-[15ch] sm:text-5xl lg:text-[56px]">
+                    {isRestoreMode ? t.restoreLandingTitle : landing.studioHeroTitle}
                   </h1>
-                  <p className="mt-3 max-w-xl text-[15px] leading-6 text-[#d8ece6] max-[359px]:hidden min-[360px]:mt-5 min-[360px]:text-base min-[360px]:leading-7 sm:text-lg">
-                    {isRestoreMode ? t.restoreLandingDesc : (t.homeHeroDesc || t.uploadDesc)}
+                  <p className="mt-3 max-w-[58ch] text-[15px] leading-6 text-[#d8ece6] max-[359px]:hidden min-[360px]:mt-5 min-[360px]:text-base min-[360px]:leading-7 sm:text-lg">
+                    {isRestoreMode ? t.restoreLandingDesc : landing.studioHeroDesc}
                   </p>
 
                   <button
                     ref={uploadCtaRef}
                     type="button"
-                    onClick={() => {
-                      setPendingUploadStyle(isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : null);
-                      trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD });
-                      fileInputRef.current?.click();
-                    }}
+                    onClick={() => openUpload(isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : null)}
                     onDragEnter={(event) => { event.preventDefault(); setIsUploadDragging(true); }}
                     onDragOver={(event) => event.preventDefault()}
                     onDragLeave={() => setIsUploadDragging(false)}
                     onDrop={handleImageDrop}
-                    className={`mt-4 flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md px-4 py-3 text-base font-extrabold text-white shadow-[0_16px_36px_rgba(0,0,0,0.24)] transition-colors active:translate-y-px min-[360px]:mt-7 min-[360px]:min-h-16 min-[360px]:px-5 min-[360px]:py-4 sm:text-lg ${isUploadDragging ? 'bg-white text-lab-ink' : 'bg-lab-coral hover:bg-white hover:text-lab-ink'}`}
+                    className={`mt-4 flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md px-4 py-3 text-base font-extrabold text-lab-ink shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-colors active:translate-y-px min-[360px]:mt-7 min-[360px]:min-h-16 min-[360px]:px-5 min-[360px]:py-4 sm:text-lg ${isUploadDragging ? 'bg-white' : 'bg-lab-coral hover:bg-white'}`}
                   >
-                    <ICONS.Camera /> {isRestoreMode ? t.restoreLandingCta : t.startBtn}
+                    <ICONS.Camera /> {isRestoreMode ? t.restoreLandingCta : landing.studioHeroCta}
                   </button>
                   <p className="mt-2 text-xs font-semibold leading-5 text-[#d8ece6] min-[360px]:mt-3 min-[360px]:text-sm">
-                    {isRestoreMode ? t.restoreLandingFree : t.freeNoSignup}
+                    {userEmail
+                      ? `${t.creditsLeft}: ${credits}`
+                      : freeGenerationsUsed > 0
+                        ? `${t.freeCredits}: ${freeCreditsLeft}`
+                        : isRestoreMode ? t.restoreLandingFree : t.freeNoSignup}
                   </p>
                 </div>
 
-                <figure className="order-1 grid h-24 grid-cols-2 overflow-hidden bg-[#0c201d] min-[360px]:h-40 lg:hidden">
-                  <div className="relative overflow-hidden border-r border-white/40">
-                    <img src="/demo/restoration-before.webp" alt={t.demoBefore} className="h-full w-full object-cover object-top" />
-                    <span className="absolute bottom-2 left-2 rounded bg-lab-ink px-2 py-1 text-xs font-bold text-white">{t.demoBefore}</span>
-                  </div>
-                  <div className="relative overflow-hidden">
-                    <img src="/demo/restoration-after.webp" alt={t.demoAfter} className="h-full w-full object-cover object-top" />
-                    <span className="absolute bottom-2 left-2 rounded bg-lab-teal px-2 py-1 text-xs font-bold text-white">{t.demoAfter}</span>
-                  </div>
-                </figure>
-
-                <figure className="relative hidden min-h-[360px] overflow-hidden bg-[#0c201d] lg:block lg:min-h-full">
-                  <img
-                    src={restoreDemoAfter ? '/demo/restoration-after.webp' : '/demo/restoration-before.webp'}
-                    alt={restoreDemoAfter ? t.demoAfter : t.demoBefore}
-                    className="absolute inset-0 h-full w-full object-cover object-top"
-                  />
-                  <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-3">
-                    <div className="grid grid-cols-2 rounded-md bg-white p-1 shadow-[0_10px_26px_rgba(0,0,0,0.24)]" role="group" aria-label={`${t.demoBefore} / ${t.demoAfter}`}>
-                      <button
-                        type="button"
-                        onClick={() => setRestoreDemoAfter(false)}
-                        aria-pressed={!restoreDemoAfter}
-                        className={`min-h-10 rounded px-4 text-sm font-bold ${!restoreDemoAfter ? 'bg-lab-ink text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
-                      >
-                        {t.demoBefore}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRestoreDemoAfter(true)}
-                        aria-pressed={restoreDemoAfter}
-                        className={`min-h-10 rounded px-4 text-sm font-bold ${restoreDemoAfter ? 'bg-lab-teal text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
-                      >
-                        {t.demoAfter}
-                      </button>
-                    </div>
-                    <a href="https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg" target="_blank" rel="noreferrer" className="rounded bg-white px-3 py-2 text-xs font-semibold text-lab-ink underline underline-offset-2">
-                      {t.demoSource}
-                    </a>
-                  </div>
-                </figure>
+                <BeforeAfter
+                  before={isRestoreMode ? '/demo/restoration-before.webp' : '/examples/studio-selfie-before.webp'}
+                  after={isRestoreMode ? '/demo/restoration-after.webp' : '/examples/studio-classic-after.webp'}
+                  beforeLabel={t.demoBefore}
+                  afterLabel={t.demoAfter}
+                  ariaLabel={landing.compareLabel}
+                  className="order-1 h-32 min-[360px]:h-44 lg:order-none lg:h-full lg:min-h-[640px]"
+                  objectPosition={isRestoreMode ? 'center top' : 'center'}
+                  loading="eager"
+                />
               </div>
             </section>
 
-            <div className="grid border-x border-b border-lab-line bg-white sm:grid-cols-3">
-              {[t.restoreTrustFace, t.restoreTrustOriginal, t.restoreTrustPreview].map((promise, index) => (
-                <div key={promise} className={`flex min-h-20 items-center gap-3 px-5 py-4 text-sm font-semibold leading-5 text-lab-ink ${index > 0 ? 'border-t border-lab-line sm:border-l sm:border-t-0' : ''}`}>
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lab-teal text-sm font-extrabold text-white" aria-hidden="true">✓</span>
-                  <span>{promise}</span>
-                </div>
-              ))}
-            </div>
+            <section className="bg-white px-4 sm:px-6">
+              <div className="mx-auto grid max-w-[1200px] divide-y divide-lab-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                {[t.restoreTrustFace, t.restoreTrustOriginal, t.restoreTrustPreview].map((promise) => (
+                  <div key={promise} className="flex min-h-16 items-center gap-3 py-4 text-sm font-semibold leading-5 text-lab-ink sm:px-6">
+                    <svg className="shrink-0 text-lab-teal" width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+                      <circle cx="11" cy="11" r="10" fill="currentColor" />
+                      <path d="m6.8 11.2 2.7 2.6 5.7-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>{promise}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-            {!isRestoreMode && (
-              <section className="py-12 sm:py-16">
-                <div className="mb-7 max-w-2xl">
-                  <h2 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-4xl">{t.chooseStyle}</h2>
-                  <p className="mt-3 text-base leading-7 text-lab-ink/70">{t.modeStartHint || t.howItWorks}</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {[
-                    { id: PhotoStyle.RESTORE_OLD_PHOTO, icon: <ICONS.Restore />, title: t.restoreOldPhoto, desc: t.restoreOldPhotoDesc, tone: 'bg-lab-teal text-white' },
-                    { id: PhotoStyle.CLASSIC_STUDIO, icon: <ICONS.Studio />, title: t.classicStudio, desc: t.classicStudioDesc, tone: 'bg-white text-lab-ink' },
-                    { id: PhotoStyle.FASHION_EDITORIAL, icon: <ICONS.Fashion />, title: t.fashionEditorial, desc: t.fashionEditorialDesc, tone: 'bg-[#fff1ed] text-lab-ink' },
-                    { id: PhotoStyle.BUSINESS_LUXE, icon: <ICONS.Luxe />, title: t.businessLuxe, desc: t.businessLuxeDesc, tone: 'bg-[#eaf0ff] text-lab-ink' },
-                  ].map((style) => (
-                    <button
-                      key={style.id}
-                      type="button"
-                      onClick={() => {
-                        setPendingUploadStyle(style.id);
-                        trackFunnel('style_selected', { language, screen: AppStep.UPLOAD, style: style.id });
-                        fileInputRef.current?.click();
-                      }}
-                      className={`min-h-48 rounded-lg border border-lab-line p-5 text-left transition-transform hover:-translate-y-1 ${style.tone}`}
-                    >
-                      <span className="mb-8 flex h-11 w-11 items-center justify-center rounded-md border border-current/20">{style.icon}</span>
-                      <span className="block text-lg font-extrabold">{style.title}</span>
-                      <span className="mt-2 block text-sm leading-5 opacity-75">{style.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
+            <LandingSections
+              language={language}
+              isRestoreMode={isRestoreMode}
+              onUpload={() => openUpload(isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : null)}
+              onSelectStyle={(style) => openUpload(style)}
+              onShowPricing={() => {
+                trackFunnel('payment_opened', { language, screen: AppStep.UPLOAD });
+                setShowPaymentModal(true);
+              }}
+            />
           </div>
         );
 
@@ -710,7 +590,7 @@ const App: React.FC = () => {
               {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-auto max-h-[680px] w-full object-contain" />}
               <div className="pointer-events-none absolute inset-x-6 bottom-6 flex items-center justify-between gap-3">
                 <span className="rounded-md bg-lab-ink px-4 py-2 text-xs font-bold text-white">{t.originalPhoto}</span>
-                <span className="flex min-h-11 items-center gap-2 rounded-md bg-lab-coral px-4 py-2 text-xs font-extrabold text-white shadow-lg">
+                <span className="flex min-h-11 items-center gap-2 rounded-md bg-lab-coral px-4 py-2 text-xs font-extrabold text-lab-ink shadow-lg">
                   <ICONS.Camera /> {t.replacePhoto}
                 </span>
               </div>
@@ -724,13 +604,13 @@ const App: React.FC = () => {
                 className="group relative h-52 w-full overflow-hidden rounded-lg border border-lab-line bg-white shadow-[0_12px_32px_rgba(21,48,43,0.1)] sm:h-64 lg:hidden"
               >
                 {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-full w-full object-contain" />}
-                <span className="pointer-events-none absolute inset-x-3 bottom-3 flex min-h-12 items-center justify-center gap-2 rounded-md bg-lab-coral px-4 py-3 text-sm font-extrabold text-white shadow-lg">
+                <span className="pointer-events-none absolute inset-x-3 bottom-3 flex min-h-12 items-center justify-center gap-2 rounded-md bg-lab-coral px-4 py-3 text-sm font-extrabold text-lab-ink shadow-lg">
                   <ICONS.Camera /> {t.replacePhoto}
                 </span>
               </button>
 
               <div>
-                <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-4xl">{t.chooseStyle}</h1>
+                <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-4xl">{LANDING_CONTENT[language].modeTitle}</h1>
                 <p className="mt-3 max-w-xl text-sm leading-6 text-lab-ink/65">{premiumFeaturesEnabled ? t.setupShot : t.modeStartHint}</p>
               </div>
 
@@ -745,7 +625,7 @@ const App: React.FC = () => {
                       key={format.id}
                       type="button"
                       onClick={() => setAspectRatio(format.id)}
-                      className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md px-3 py-2 transition-colors ${aspectRatio === format.id ? 'bg-lab-blue text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
+                      className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md px-3 py-2 transition-colors ${aspectRatio === format.id ? 'bg-lab-teal text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
                     >
                       <span className="font-bold">{format.label}</span>
                       <span className="text-xs opacity-70">{format.sub}</span>
@@ -755,14 +635,14 @@ const App: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-sm font-bold text-lab-ink">{t.chooseStyleLabel}</label>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {[
-                    { id: PhotoStyle.RESTORE_OLD_PHOTO, icon: <ICONS.Restore />, title: t.restoreOldPhoto || 'Restore Old Photo', desc: t.restoreOldPhotoDesc || 'Repair damage and colorize with period-accurate tones.' },
-                    { id: PhotoStyle.CLASSIC_STUDIO, icon: <ICONS.Studio />, title: t.classicStudio, desc: t.classicStudioDesc },
-                    { id: PhotoStyle.FASHION_EDITORIAL, icon: <ICONS.Fashion />, title: t.fashionEditorial, desc: t.fashionEditorialDesc },
-                    { id: PhotoStyle.BUSINESS_LUXE, icon: <ICONS.Luxe />, title: t.businessLuxe, desc: t.businessLuxeDesc }
-                  ].map((style) => (
+                  {(isRestoreMode ? [
+                    { id: PhotoStyle.RESTORE_OLD_PHOTO, image: '/demo/restoration-after.webp', title: t.restoreOldPhoto || 'Restore Old Photo', desc: t.restoreOldPhotoDesc || 'Repair damage and colorize with period-accurate tones.' },
+                  ] : [
+                    { id: PhotoStyle.CLASSIC_STUDIO, image: '/examples/studio-classic-after.webp', title: t.classicStudio, desc: t.classicStudioDesc },
+                    { id: PhotoStyle.FASHION_EDITORIAL, image: '/examples/studio-editorial-after.webp', title: t.fashionEditorial, desc: t.fashionEditorialDesc },
+                    { id: PhotoStyle.BUSINESS_LUXE, image: '/examples/studio-office-after.webp', title: t.businessLuxe, desc: t.businessLuxeDesc },
+                  ]).map((style) => (
                     <button
                       key={style.id}
                       type="button"
@@ -774,12 +654,17 @@ const App: React.FC = () => {
                         }
                       }}
                       disabled={processing.isProcessing}
-                      className={`group flex min-h-32 items-start gap-4 rounded-lg border p-4 text-left transition-all ${selectedStyle === style.id ? 'border-lab-teal bg-lab-teal text-white shadow-[0_12px_26px_rgba(8,120,111,0.18)]' : 'border-lab-line bg-white text-lab-ink hover:-translate-y-0.5 hover:border-lab-teal'}`}
+                      className={`group relative overflow-hidden rounded-lg border bg-white text-left text-lab-ink transition-[border-color,transform] ${selectedStyle === style.id ? 'border-2 border-lab-teal' : 'border-lab-line hover:-translate-y-0.5 hover:border-lab-teal'}`}
                     >
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md ${selectedStyle === style.id ? 'bg-white text-lab-teal' : 'bg-lab-mist text-lab-ink'}`}>{style.icon}</div>
-                      <div className="min-w-0">
+                      <img src={style.image} alt="" loading="lazy" className="h-32 w-full object-cover object-top" />
+                      {selectedStyle === style.id && (
+                        <span className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-lab-teal text-white shadow-[0_6px_16px_rgba(21,48,43,0.24)]" aria-hidden="true">
+                          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="m4 9.5 3 2.8L14 5.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </span>
+                      )}
+                      <div className="min-w-0 p-4">
                         <div className="text-base font-extrabold leading-5">{style.title}</div>
-                        <div className={`mt-2 text-sm leading-5 ${selectedStyle === style.id ? 'text-white/80' : 'text-lab-ink/60'}`}>{style.desc}</div>
+                        <div className="mt-2 text-sm leading-5 text-lab-ink/60">{style.desc}</div>
                       </div>
                     </button>
                   ))}
@@ -822,7 +707,7 @@ const App: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleGenerate(selectedStyle)}
-                    className="flex min-h-16 w-full items-center justify-center gap-4 rounded-md bg-lab-coral px-5 py-4 text-lg font-extrabold text-white shadow-[0_16px_34px_rgba(240,100,73,0.25)] transition-colors hover:bg-lab-ink"
+                    className="flex min-h-16 w-full items-center justify-center gap-4 rounded-md bg-lab-coral px-5 py-4 text-lg font-extrabold text-lab-ink shadow-[0_16px_34px_rgba(241,105,79,0.25)] transition-colors hover:bg-lab-ink hover:text-white"
                   >
                     <ICONS.Magic /> {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorePhotoBtn || 'Restore Old Photo') : t.generateBtn}
                   </button>
@@ -875,6 +760,16 @@ const App: React.FC = () => {
                 className="min-h-11 rounded-md border border-lab-line bg-white px-6 py-3 text-sm font-bold text-lab-teal transition-colors active:bg-lab-teal active:text-white"
                 onPointerDown={() => setShowOriginal(true)}
                 onPointerUp={() => setShowOriginal(false)}
+                onPointerCancel={() => setShowOriginal(false)}
+                onPointerLeave={() => setShowOriginal(false)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') setShowOriginal(true);
+                }}
+                onKeyUp={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') setShowOriginal(false);
+                }}
+                onBlur={() => setShowOriginal(false)}
+                aria-pressed={showOriginal}
               >
                 {t.showOriginal}
               </button>
@@ -925,7 +820,7 @@ const App: React.FC = () => {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={handleDownload}
-                  className="flex min-h-16 flex-[2] items-center justify-center gap-3 rounded-md bg-lab-coral px-8 py-4 text-lg font-extrabold text-white shadow-[0_14px_32px_rgba(240,100,73,0.22)] transition-colors hover:bg-lab-ink"
+                  className="flex min-h-16 flex-[2] items-center justify-center gap-3 rounded-md bg-lab-coral px-8 py-4 text-lg font-extrabold text-lab-ink shadow-[0_14px_32px_rgba(241,105,79,0.22)] transition-colors hover:bg-lab-ink hover:text-white"
                 >
                   <ICONS.Download /> {t.download}
                 </button>
@@ -942,9 +837,9 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleAnimatePhotoClick}
-                  className="flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md border border-lab-blue bg-[#eaf0ff] px-6 py-4 text-base font-extrabold text-lab-blue transition-colors hover:bg-lab-blue hover:text-white"
+                  className="flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md border border-lab-line bg-white px-6 py-4 text-base font-extrabold text-lab-teal transition-colors hover:border-lab-teal hover:bg-lab-mist"
                 >
-                  <span aria-hidden="true" className="text-lg">▶</span>
+                  <ICONS.Play />
                   {t.animatePhoto}
                   <span className="rounded-md border border-current px-2 py-0.5 text-[9px] uppercase tracking-widest">PRO</span>
                 </button>
@@ -977,7 +872,7 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setStep(AppStep.UPLOAD)}
-                  className="inline-flex min-h-14 items-center gap-3 rounded-md bg-lab-coral px-8 py-4 font-extrabold text-white transition-colors hover:bg-lab-ink"
+                  className="inline-flex min-h-14 items-center gap-3 rounded-md bg-lab-coral px-8 py-4 font-extrabold text-lab-ink transition-colors hover:bg-lab-ink hover:text-white"
                 >
                   <ICONS.Magic /> {t.startBtn}
                 </button>
@@ -1013,7 +908,7 @@ const App: React.FC = () => {
                           a.click();
                           URL.revokeObjectURL(url);
                         }}
-                        className="flex w-full items-center justify-center gap-2 rounded-md bg-lab-coral px-3 py-2.5 text-xs font-extrabold text-white transition-colors hover:bg-white hover:text-lab-ink"
+                        className="flex w-full items-center justify-center gap-2 rounded-md bg-lab-coral px-3 py-2.5 text-xs font-extrabold text-lab-ink transition-colors hover:bg-white"
                       >
                         <ICONS.Download /> {t.download || 'Download'}
                       </button>
@@ -1038,6 +933,7 @@ const App: React.FC = () => {
         onLanguageChange={setLanguage}
         mode={isRestoreMode ? 'restore' : 'studio'}
         credits={userEmail ? credits : freeCreditsLeft}
+        showCredits={Boolean(userEmail || freeGenerationsUsed > 0)}
         userEmail={userEmail}
         hasGallery={hasGallery}
         onViewHistory={() => setStep(AppStep.HISTORY)}
@@ -1067,13 +963,29 @@ const App: React.FC = () => {
         ref={fileInputRef}
         onChange={handleImageUpload}
       />
-      <main className="relative z-10 w-full flex-grow px-4 py-4 sm:px-6 sm:py-6">
+      <main className={`relative z-10 w-full flex-grow ${step === AppStep.UPLOAD ? '' : 'px-4 py-4 sm:px-6 sm:py-6'}`}>
         {renderContent()}
       </main>
 
-      <footer className="mt-auto border-t border-lab-line bg-white px-4 py-8 text-center">
-        <a href="mailto:oleg@lihtneai.ee" className="block text-xs leading-5 text-lab-ink/60 hover:text-lab-teal">{TRANSLATIONS[language]?.deleteDataMsg || 'To delete your images and data, write to oleg@lihtneai.ee'}</a>
-        <a href="/privacy-policy.html" target="_blank" className="mt-2 block text-xs font-semibold text-lab-teal underline underline-offset-4">{TRANSLATIONS[language]?.privacyPolicyLink || 'Privacy Policy'}</a>
+      <footer className="mt-auto bg-lab-ink px-4 py-10 text-white sm:px-6">
+        <div className="mx-auto grid max-w-[1200px] gap-8 md:grid-cols-[1.2fr_0.8fr_1fr]">
+          <div>
+            <a href={isRestoreMode ? '/restore' : '/'} className="text-xl font-extrabold">ShotMe<span className="text-lab-coral">.ee</span></a>
+            <p className="mt-3 text-sm font-semibold text-[#d8ece6]">LihtneAI OÜ</p>
+            <p className="mt-2 max-w-sm text-xs leading-5 text-[#d8ece6]/70">{TRANSLATIONS[language]?.deleteDataMsg || 'To delete your images and data, write to oleg@lihtneai.ee'}</p>
+          </div>
+          <nav className="flex flex-col items-start gap-3 text-sm font-semibold text-[#d8ece6]" aria-label="Footer">
+            <a href="/restore" className="hover:text-white">{TRANSLATIONS[language].restoreOldPhoto}</a>
+            <a href="/" className="hover:text-white">{TRANSLATIONS[language].uploadTitle}</a>
+            <a href={`${isRestoreMode ? '/restore' : '/'}#pricing`} className="hover:text-white">{LANDING_CONTENT[language].pricingTitle}</a>
+            <a href={`${isRestoreMode ? '/restore' : '/'}#faq`} className="hover:text-white">FAQ</a>
+          </nav>
+          <div className="flex flex-col items-start gap-3 text-sm">
+            <a href="mailto:oleg@lihtneai.ee" className="font-semibold text-white hover:text-lab-coral">oleg@lihtneai.ee</a>
+            <a href="/terms.html" target="_blank" className="text-[#d8ece6] underline decoration-white/25 underline-offset-4 hover:text-white">Terms of Use</a>
+            <a href="/privacy-policy.html" target="_blank" className="text-[#d8ece6] underline decoration-white/25 underline-offset-4 hover:text-white">{TRANSLATIONS[language]?.privacyPolicyLink || 'Privacy Policy'}</a>
+          </div>
+        </div>
       </footer>
 
       {processing.isProcessing && (
@@ -1182,7 +1094,7 @@ const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setGenerationError(null)}
-              className="min-h-12 w-full rounded-md bg-lab-coral px-5 py-3 font-extrabold text-white transition-colors hover:bg-lab-ink"
+              className="min-h-12 w-full rounded-md bg-lab-coral px-5 py-3 font-extrabold text-lab-ink transition-colors hover:bg-lab-ink hover:text-white"
             >
               {TRANSLATIONS[language].understood}
             </button>
@@ -1208,7 +1120,7 @@ const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowAnimatePaywall(false)}
-              className="min-h-12 w-full rounded-md bg-lab-coral px-5 py-3 font-extrabold text-white transition-colors hover:bg-lab-ink"
+              className="min-h-12 w-full rounded-md bg-lab-coral px-5 py-3 font-extrabold text-lab-ink transition-colors hover:bg-lab-ink hover:text-white"
             >
               {TRANSLATIONS[language].understood}
             </button>
