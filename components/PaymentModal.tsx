@@ -20,7 +20,7 @@ const TEXTS: Record<string, any> = {
         best: 'Лучший выбор',
         secure: 'Безопасная оплата через Stripe',
         featuresTitle: 'В платном пакете:',
-        features: ['личная галерея портретов', 'ручные правки результата', 'голосовые правки']
+        features: ['личная галерея восстановленных фото', 'ручные правки результата', 'голосовые правки']
     },
     en: {
         title: 'Choose your plan',
@@ -35,7 +35,7 @@ const TEXTS: Record<string, any> = {
         best: 'Best Value',
         secure: 'Secure payment via Stripe',
         featuresTitle: 'Included in paid packs:',
-        features: ['your private portrait gallery', 'manual result corrections', 'voice corrections']
+        features: ['your private restored photo gallery', 'manual result corrections', 'voice corrections']
     },
     et: {
         title: 'Vali oma pakett',
@@ -50,7 +50,7 @@ const TEXTS: Record<string, any> = {
         best: 'Parim valik',
         secure: 'Turvaline makse Stripe kaudu',
         featuresTitle: 'Tasulises paketis:',
-        features: ['isiklik portreegalerii', 'käsitsi parandused', 'häälparandused']
+        features: ['isiklik taastatud fotode galerii', 'käsitsi parandused', 'häälparandused']
     },
     lv: {
         title: 'Izvēlieties paketi',
@@ -65,7 +65,7 @@ const TEXTS: Record<string, any> = {
         best: 'Labākā izvēle',
         secure: 'Droša apmaksa ar Stripe',
         featuresTitle: 'Maksas paketē:',
-        features: ['personīgā portretu galerija', 'manuāli labojumi', 'balss labojumi']
+        features: ['personīgā atjaunoto foto galerija', 'manuāli labojumi', 'balss labojumi']
     },
     lt: {
         title: 'Pasirinkite paketą',
@@ -80,7 +80,7 @@ const TEXTS: Record<string, any> = {
         best: 'Geriausias pasirinkimas',
         secure: 'Saugus mokėjimas per Stripe',
         featuresTitle: 'Mokamame pakete:',
-        features: ['asmeninė portretų galerija', 'rankiniai pataisymai', 'balso pataisymai']
+        features: ['asmeninė atkurtų nuotraukų galerija', 'rankiniai pataisymai', 'balso pataisymai']
     },
     fi: {
         title: 'Valitse paketti',
@@ -95,7 +95,7 @@ const TEXTS: Record<string, any> = {
         best: 'Paras valinta',
         secure: 'Turvallinen maksu Stripen kautta',
         featuresTitle: 'Maksulliseen pakettiin kuuluu:',
-        features: ['oma muotokuvagalleria', 'manuaaliset korjaukset', 'äänikorjaukset']
+        features: ['oma entisöityjen kuvien galleria', 'manuaaliset korjaukset', 'äänikorjaukset']
     }
 };
 

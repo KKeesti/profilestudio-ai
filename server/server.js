@@ -64,7 +64,7 @@ const ANONYMOUS_COOKIE = 'shotme_anon';
 const SESSION_MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
 const ANONYMOUS_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
-const ALLOWED_STYLES = new Set(['RESTORE_OLD_PHOTO', 'CLASSIC_STUDIO', 'FASHION_EDITORIAL', 'BUSINESS_LUXE']);
+const ALLOWED_STYLES = new Set(['RESTORE_OLD_PHOTO']);
 const ALLOWED_ASPECT_RATIOS = new Set(['9:16', '16:9']);
 const PLANS = {
   plan_small: { priceId: process.env.PRICE_20_ID, credits: 20, amountCents: 500 },
@@ -100,7 +100,7 @@ Preserve every visible person's face as close to the source photo as possible: f
 Do NOT beautify, de-age, reshape, replace, stylize, smooth, or idealize faces unless the user explicitly asks for it.
 STRICT HAIR PRESERVATION: preserve hair color, length, volume, hairline, and style exactly as in the original photo unless explicitly requested.
 Restoring, cleaning up, sharpening, and colorizing old or black-and-white photos is allowed when it improves the result, but it must never change identity, facial features, age, expression, or distinctive marks.
-Apply the selected studio style only to lighting, background, framing, and clothing mood while keeping faces and identity unchanged.
+Keep the result faithful to the restored photograph. Apply requested corrections only to the stated damaged area or restoration detail.
 Return exactly one generated image. Do not answer with text only.`;
 
 const RESTORATION_PROMPT = `PHOTO RESTORATION AND PERIOD COLORIZATION MODE.
@@ -813,10 +813,7 @@ app.post('/api/generate', optionalAuth, async (req, res) => {
       if (!user || credits <= 0) throw new HttpError(403, 'OUT_OF_CREDITS');
     }
 
-    const isRestorationStyle = style === 'RESTORE_OLD_PHOTO';
-    const generationPrompt = isRestorationStyle
-      ? `${RESTORATION_PROMPT}\nAdditional historical context from user, if any: ${safePrompt || 'none'}`
-      : `${MASTER_PROMPT}\nStyle: ${style}. ${safePrompt || ''}`;
+    const generationPrompt = `${RESTORATION_PROMPT}\nAdditional historical context from user, if any: ${safePrompt || 'none'}`;
     const genImg = await generateImage([
       { text: generationPrompt },
       { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } },

@@ -20,11 +20,11 @@ const ALLOWED_EVENTS = new Set([
 
 const ALLOWED_LANGUAGES = new Set(['en', 'et', 'ru', 'lv', 'lt', 'fi']);
 const ALLOWED_DEVICES = new Set(['mobile', 'tablet', 'desktop']);
-const ALLOWED_SCREENS = new Set(['upload', 'choose_style', 'result', 'history']);
-const ALLOWED_STYLES = new Set(['RESTORE_OLD_PHOTO', 'CLASSIC_STUDIO', 'FASHION_EDITORIAL', 'BUSINESS_LUXE']);
+const ALLOWED_SCREENS = new Set(['upload', 'result', 'history']);
+const ALLOWED_STYLES = new Set(['RESTORE_OLD_PHOTO']);
 const ALLOWED_FAILURE_REASONS = new Set(['credits', 'rate_limit', 'invalid_image', 'network', 'provider', 'unknown']);
 const ALLOWED_PLANS = new Set(['plan_small', 'plan_large']);
-const ALLOWED_SURFACES = new Set(['studio', 'restore']);
+const ALLOWED_SURFACES = new Set(['restore']);
 const ALLOWED_SCROLL_DEPTHS = new Set([25, 50, 75, 100]);
 
 const FUNNEL_STEPS = [

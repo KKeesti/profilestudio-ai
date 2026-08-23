@@ -4,7 +4,6 @@ import { AppStep, ProcessingState, PhotoStyle, AspectRatio, Language } from './t
 import Header from './components/Header';
 import EmailModal from './components/EmailModal';
 import PaymentModal from './components/PaymentModal';
-import BeforeAfter from './components/BeforeAfter';
 import LandingSections from './components/LandingSections';
 import RestorationMorph from './components/RestorationMorph';
 import { GeminiService } from './services/geminiService';
@@ -14,12 +13,6 @@ import { LANDING_CONTENT } from './landingContent';
 import { classifyFunnelError, trackFunnel } from './services/analyticsService';
 
 const FREE_TRIAL_LIMIT = 10;
-
-const isRestoreEntryPoint = () => {
-  if (typeof window === 'undefined') return false;
-  const path = window.location.pathname.replace(/\/+$/, '');
-  return path === '/restore' || new URLSearchParams(window.location.search).get('mode') === 'restore';
-};
 
 const detectBrowserLanguage = (): Language => {
   if (typeof navigator === 'undefined') return Language.EN;
@@ -46,14 +39,12 @@ const getStoredFreeGenerationsUsed = () => {
 };
 
 const App: React.FC = () => {
-  const [isRestoreMode] = useState(isRestoreEntryPoint);
   const [language, setLanguage] = useState<Language>(() => detectBrowserLanguage());
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
   const [selectedStyle, setSelectedStyle] = useState<PhotoStyle | null>(null);
-  const [customPrompt, setCustomPrompt] = useState('');
   const [correctionRequest, setCorrectionRequest] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
   const [hasGallery, setHasGallery] = useState(false);
@@ -79,7 +70,6 @@ const App: React.FC = () => {
   const [showAnimatePaywall, setShowAnimatePaywall] = useState(false);
   const [generationError, setGenerationError] = useState<'restricted' | 'unavailable' | null>(null);
   const [isUploadDragging, setIsUploadDragging] = useState(false);
-  const [pendingUploadStyle, setPendingUploadStyle] = useState<PhotoStyle | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -100,10 +90,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const t = TRANSLATIONS[language];
     document.documentElement.lang = language;
-    document.title = isRestoreMode
-      ? `ShotMe.ee - ${t.restoreLandingTitle}`
-      : 'ShotMe.ee - AI Photo Studio';
-  }, [isRestoreMode, language]);
+    document.title = `ShotMe.ee - ${t.restoreLandingTitle}`;
+  }, [language]);
 
   useEffect(() => {
     if (step !== AppStep.UPLOAD || ctaImpressionTrackedRef.current || !uploadCtaRef.current) return;
@@ -230,14 +218,13 @@ const App: React.FC = () => {
     localStorage.setItem('ps_free_generations_used', freeGenerationsUsed.toString());
   }, [freeGenerationsUsed]);
 
-  const handleGenerate = async (style: PhotoStyle, sourceImage = originalImage) => {
+  const handleGenerate = async (style: PhotoStyle, sourceImage = originalImage, generationAspect = aspectRatio) => {
     if (!sourceImage) return;
 
-    const generationEntryScreen = isRestoreMode ? AppStep.UPLOAD : AppStep.CHOOSE_STYLE;
+    const generationEntryScreen = AppStep.UPLOAD;
     const activeEmail = userEmail;
     const isAnonymousFreeGeneration = !activeEmail;
     let currentCredits = Number(credits);
-    let canUsePremiumDetails = premiumFeaturesEnabled;
 
     if (isAnonymousFreeGeneration) {
       if (freeCreditsLeft <= 0) {
@@ -251,8 +238,6 @@ const App: React.FC = () => {
         currentCredits = userData.credits;
         setCredits(userData.credits);
         setHasGallery(userData.hasPaid || false);
-        canUsePremiumDetails = Boolean(userData.hasPaid);
-
       } catch (e: any) {
         alert('Network error syncing user: ' + e.message);
         return;
@@ -266,21 +251,13 @@ const App: React.FC = () => {
     }
 
     const t = TRANSLATIONS[language];
-    const statusMap = {
-      [PhotoStyle.RESTORE_OLD_PHOTO]: t.processingRestore || 'Restoring and colorizing the old photo...',
-      [PhotoStyle.CLASSIC_STUDIO]: t.processingClassic,
-      [PhotoStyle.FASHION_EDITORIAL]: t.processingFashion,
-      [PhotoStyle.BUSINESS_LUXE]: t.processingBusiness,
-    };
-
     trackFunnel('generation_started', { language, screen: generationEntryScreen, style });
-    setProcessing({ isProcessing: true, status: statusMap[style] });
+    setProcessing({ isProcessing: true, status: t.processingRestore || 'Restoring and colorizing the old photo...' });
 
     try {
       const base64Data = sourceImage.split(',')[1];
       const mimeType = sourceImage.split(';')[0].split(':')[1];
-      const promptToSend = canUsePremiumDetails ? customPrompt : '';
-      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, aspectRatio, promptToSend);
+      const res = await GeminiService.generateStudioPhoto(base64Data, mimeType, style, generationAspect, '');
       setResultImage(res);
       trackFunnel('generation_succeeded', { language, screen: AppStep.RESULT, style });
       setStep(AppStep.RESULT);
@@ -312,18 +289,19 @@ const App: React.FC = () => {
       setResultImage(null);
       setShowOriginal(false);
 
-      const immediateStyle = isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : pendingUploadStyle;
-      if (immediateStyle && (isRestoreMode || !premiumFeaturesEnabled)) {
-        setSelectedStyle(immediateStyle);
-        setPendingUploadStyle(null);
-        trackFunnel('style_selected', { language, screen: AppStep.UPLOAD, style: immediateStyle });
-        void handleGenerate(immediateStyle, imageData);
-        return;
-      }
-
-      if (immediateStyle) setSelectedStyle(immediateStyle);
-      setPendingUploadStyle(null);
-      setStep(AppStep.CHOOSE_STYLE);
+      const probe = new Image();
+      probe.onload = () => {
+        const detectedAspect: AspectRatio = probe.naturalWidth >= probe.naturalHeight ? '16:9' : '9:16';
+        setAspectRatio(detectedAspect);
+        setSelectedStyle(PhotoStyle.RESTORE_OLD_PHOTO);
+        trackFunnel('style_selected', { language, screen: AppStep.UPLOAD, style: PhotoStyle.RESTORE_OLD_PHOTO });
+        void handleGenerate(PhotoStyle.RESTORE_OLD_PHOTO, imageData, detectedAspect);
+      };
+      probe.onerror = () => {
+        setSelectedStyle(PhotoStyle.RESTORE_OLD_PHOTO);
+        void handleGenerate(PhotoStyle.RESTORE_OLD_PHOTO, imageData, aspectRatio);
+      };
+      probe.src = imageData;
     };
     reader.readAsDataURL(file);
   };
@@ -400,7 +378,7 @@ const App: React.FC = () => {
   const handleDownload = () => {
     if (!resultImage) return;
     trackFunnel('result_downloaded', { language, screen: AppStep.RESULT, style: selectedStyle || undefined });
-    downloadDataUrl(resultImage, isRestoreMode ? 'shotme-restored-photo.jpg' : 'profile-studio-ai-portrait.jpg');
+    downloadDataUrl(resultImage, 'shotme-restored-photo.jpg');
   };
 
   const handleAnimatePhotoClick = () => {
@@ -410,10 +388,6 @@ const App: React.FC = () => {
       style: selectedStyle || undefined,
     });
     setShowAnimatePaywall(true);
-  };
-
-  const addTag = (tag: string) => {
-    setCustomPrompt(prev => prev ? `${prev}, ${tag.toLowerCase()}` : tag);
   };
 
   const startRecording = async () => {
@@ -488,19 +462,8 @@ const App: React.FC = () => {
   const renderContent = () => {
     const t = TRANSLATIONS[language];
     const landing = LANDING_CONTENT[language];
-    const QUICK_TAGS = [
-      t.forTinder,
-      t.instaStyle,
-      t.businessPortrait,
-      t.softSmile,
-      t.studioLight,
-      t.elegantLook,
-      t.cinematic,
-      t.naturalLook
-    ];
-    const openUpload = (style: PhotoStyle | null = null) => {
-      setPendingUploadStyle(style);
-      trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD, style: style || undefined });
+    const openUpload = () => {
+      trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD, style: PhotoStyle.RESTORE_OLD_PHOTO });
       fileInputRef.current?.click();
     };
 
@@ -512,52 +475,39 @@ const App: React.FC = () => {
               <div className="mx-auto grid max-w-[1200px] lg:min-h-[640px] lg:grid-cols-[0.9fr_1.1fr]">
                 <div className="order-2 flex flex-col justify-center px-4 py-5 min-[360px]:px-6 min-[360px]:py-9 sm:px-10 lg:order-none lg:px-14 lg:py-16">
                   <h1 className="max-w-[16ch] text-balance text-[28px] font-extrabold leading-[1.05] tracking-[-0.03em] min-[360px]:text-4xl sm:max-w-[15ch] sm:text-5xl lg:text-[56px]">
-                    {isRestoreMode ? t.restoreLandingTitle : landing.studioHeroTitle}
+                    {t.restoreLandingTitle}
                   </h1>
                   <p className="mt-3 max-w-[58ch] text-[15px] leading-6 text-[#d8ece6] max-[359px]:hidden min-[360px]:mt-5 min-[360px]:text-base min-[360px]:leading-7 sm:text-lg">
-                    {isRestoreMode ? t.restoreLandingDesc : landing.studioHeroDesc}
+                    {t.restoreLandingDesc}
                   </p>
 
                   <button
                     ref={uploadCtaRef}
                     type="button"
-                    onClick={() => openUpload(isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : null)}
+                    onClick={openUpload}
                     onDragEnter={(event) => { event.preventDefault(); setIsUploadDragging(true); }}
                     onDragOver={(event) => event.preventDefault()}
                     onDragLeave={() => setIsUploadDragging(false)}
                     onDrop={handleImageDrop}
                     className={`mt-4 flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md px-4 py-3 text-base font-extrabold text-lab-ink shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-colors active:translate-y-px min-[360px]:mt-7 min-[360px]:min-h-16 min-[360px]:px-5 min-[360px]:py-4 sm:text-lg ${isUploadDragging ? 'bg-white' : 'bg-lab-coral hover:bg-white'}`}
                   >
-                    <ICONS.Camera /> {isRestoreMode ? t.restoreLandingCta : landing.studioHeroCta}
+                    <ICONS.Camera /> {t.restoreLandingCta}
                   </button>
                   <p className="mt-2 text-xs font-semibold leading-5 text-[#d8ece6] min-[360px]:mt-3 min-[360px]:text-sm">
                     {userEmail
                       ? `${t.creditsLeft}: ${credits}`
                       : freeGenerationsUsed > 0
                         ? `${t.freeCredits}: ${freeCreditsLeft}`
-                        : isRestoreMode ? t.restoreLandingFree : t.freeNoSignup}
+                        : t.restoreLandingFree}
                   </p>
                 </div>
 
-                {isRestoreMode ? (
-                  <RestorationMorph
-                    beforeLabel={t.demoBefore}
-                    afterLabel={t.demoAfter}
-                    ariaLabel={landing.compareLabel}
-                    className="order-1 h-40 min-[360px]:h-60 lg:order-none lg:h-full lg:min-h-[640px]"
-                  />
-                ) : (
-                  <BeforeAfter
-                    before="/examples/studio-selfie-before.webp"
-                    after="/examples/studio-classic-after.webp"
-                    beforeLabel={t.demoBefore}
-                    afterLabel={t.demoAfter}
-                    ariaLabel={landing.compareLabel}
-                    className="order-1 h-32 min-[360px]:h-44 lg:order-none lg:h-full lg:min-h-[640px]"
-                    objectPosition="center"
-                    loading="eager"
-                  />
-                )}
+                <RestorationMorph
+                  beforeLabel={t.demoBefore}
+                  afterLabel={t.demoAfter}
+                  ariaLabel={landing.compareLabel}
+                  className="order-1 h-40 min-[360px]:h-60 lg:order-none lg:h-full lg:min-h-[640px]"
+                />
               </div>
             </section>
 
@@ -577,9 +527,7 @@ const App: React.FC = () => {
 
             <LandingSections
               language={language}
-              isRestoreMode={isRestoreMode}
-              onUpload={() => openUpload(isRestoreMode ? PhotoStyle.RESTORE_OLD_PHOTO : null)}
-              onSelectStyle={(style) => openUpload(style)}
+              onUpload={openUpload}
               onShowPricing={() => {
                 trackFunnel('payment_opened', { language, screen: AppStep.UPLOAD });
                 setShowPaymentModal(true);
@@ -588,156 +536,12 @@ const App: React.FC = () => {
           </div>
         );
 
-      case AppStep.CHOOSE_STYLE:
-        return (
-          <div className="mx-auto grid max-w-[1120px] items-start gap-8 py-4 font-lab animate-in slide-in-from-bottom-8 duration-500 lg:grid-cols-[0.85fr_1.15fr] lg:gap-12 lg:py-8">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label={t.replacePhoto}
-              className="group relative sticky top-28 hidden w-full cursor-pointer overflow-hidden rounded-lg border border-lab-line bg-white text-left shadow-[0_18px_48px_rgba(21,48,43,0.12)] transition-colors hover:border-lab-teal lg:block"
-            >
-              {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-auto max-h-[680px] w-full object-contain" />}
-              <div className="pointer-events-none absolute inset-x-6 bottom-6 flex items-center justify-between gap-3">
-                <span className="rounded-md bg-lab-ink px-4 py-2 text-xs font-bold text-white">{t.originalPhoto}</span>
-                <span className="flex min-h-11 items-center gap-2 rounded-md bg-lab-coral px-4 py-2 text-xs font-extrabold text-lab-ink shadow-lg">
-                  <ICONS.Camera /> {t.replacePhoto}
-                </span>
-              </div>
-            </button>
-
-            <div className="space-y-8 pb-16">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                aria-label={t.replacePhoto}
-                className="group relative h-52 w-full overflow-hidden rounded-lg border border-lab-line bg-white shadow-[0_12px_32px_rgba(21,48,43,0.1)] sm:h-64 lg:hidden"
-              >
-                {originalImage && <img src={originalImage} alt={t.originalPhoto} className="h-full w-full object-contain" />}
-                <span className="pointer-events-none absolute inset-x-3 bottom-3 flex min-h-12 items-center justify-center gap-2 rounded-md bg-lab-coral px-4 py-3 text-sm font-extrabold text-lab-ink shadow-lg">
-                  <ICONS.Camera /> {t.replacePhoto}
-                </span>
-              </button>
-
-              <div>
-                <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-4xl">{LANDING_CONTENT[language].modeTitle}</h1>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-lab-ink/65">{premiumFeaturesEnabled ? t.setupShot : t.modeStartHint}</p>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-sm font-bold text-lab-ink">{t.aspectRatio}</label>
-                <div className="grid grid-cols-2 rounded-lg border border-lab-line bg-white p-1">
-                  {[
-                    { id: '9:16' as AspectRatio, label: t.portrait, sub: '9:16' },
-                    { id: '16:9' as AspectRatio, label: t.landscape, sub: '16:9' }
-                  ].map(format => (
-                    <button
-                      key={format.id}
-                      type="button"
-                      onClick={() => setAspectRatio(format.id)}
-                      className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md px-3 py-2 transition-colors ${aspectRatio === format.id ? 'bg-lab-teal text-white' : 'text-lab-ink hover:bg-lab-mist'}`}
-                    >
-                      <span className="font-bold">{format.label}</span>
-                      <span className="text-xs opacity-70">{format.sub}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {(isRestoreMode ? [
-                    { id: PhotoStyle.RESTORE_OLD_PHOTO, image: '/demo/restoration-after.webp', title: t.restoreOldPhoto || 'Restore Old Photo', desc: t.restoreOldPhotoDesc || 'Repair damage and colorize with period-accurate tones.' },
-                  ] : [
-                    { id: PhotoStyle.CLASSIC_STUDIO, image: '/examples/studio-classic-after.webp', title: t.classicStudio, desc: t.classicStudioDesc },
-                    { id: PhotoStyle.FASHION_EDITORIAL, image: '/examples/studio-editorial-after.webp', title: t.fashionEditorial, desc: t.fashionEditorialDesc },
-                    { id: PhotoStyle.BUSINESS_LUXE, image: '/examples/studio-office-after.webp', title: t.businessLuxe, desc: t.businessLuxeDesc },
-                  ]).map((style) => (
-                    <button
-                      key={style.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedStyle(style.id);
-                        trackFunnel('style_selected', { language, screen: AppStep.CHOOSE_STYLE, style: style.id });
-                        if (!premiumFeaturesEnabled) {
-                          void handleGenerate(style.id);
-                        }
-                      }}
-                      disabled={processing.isProcessing}
-                      className={`group relative overflow-hidden rounded-lg border bg-white text-left text-lab-ink transition-[border-color,transform] ${selectedStyle === style.id ? 'border-2 border-lab-teal' : 'border-lab-line hover:-translate-y-0.5 hover:border-lab-teal'}`}
-                    >
-                      <img src={style.image} alt="" loading="lazy" className="h-32 w-full object-cover object-top" />
-                      {selectedStyle === style.id && (
-                        <span className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-lab-teal text-white shadow-[0_6px_16px_rgba(21,48,43,0.24)]" aria-hidden="true">
-                          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="m4 9.5 3 2.8L14 5.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        </span>
-                      )}
-                      <div className="min-w-0 p-4">
-                        <div className="text-base font-extrabold leading-5">{style.title}</div>
-                        <div className="mt-2 text-sm leading-5 text-lab-ink/60">{style.desc}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {premiumFeaturesEnabled && (
-                <div className="space-y-4 border-t border-lab-line pt-6">
-                  <label className="text-sm font-bold text-lab-ink">{t.customPrompt}</label>
-                  <div className="space-y-4">
-                    {selectedStyle !== PhotoStyle.RESTORE_OLD_PHOTO && (
-                      <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                        {QUICK_TAGS.map(tag => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => addTag(tag)}
-                            className="whitespace-nowrap rounded-full border border-lab-line bg-white px-4 py-2 text-xs font-semibold text-lab-ink transition-colors hover:border-lab-teal hover:text-lab-teal"
-                          >
-                            + {tag}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="relative">
-                      <textarea
-                        value={customPrompt}
-                        onChange={(e) => setCustomPrompt(e.target.value)}
-                        placeholder={selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorationDetailsPlaceholder || 'Optional: approximate decade, country, uniform, or family context...') : t.customPromptPlaceholder}
-                        className="h-32 w-full resize-none rounded-lg border border-lab-line bg-white p-5 text-base text-lab-ink outline-none transition-colors placeholder:text-lab-ink/40 focus:border-lab-teal md:h-36"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedStyle && premiumFeaturesEnabled && (
-                <div className="mt-4 animate-in fade-in slide-in-from-top-6 duration-500">
-                  <button
-                    type="button"
-                    onClick={() => handleGenerate(selectedStyle)}
-                    className="flex min-h-16 w-full items-center justify-center gap-4 rounded-md bg-lab-coral px-5 py-4 text-lg font-extrabold text-lab-ink shadow-[0_16px_34px_rgba(241,105,79,0.25)] transition-colors hover:bg-lab-ink hover:text-white"
-                  >
-                    <ICONS.Magic /> {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restorePhotoBtn || 'Restore Old Photo') : t.generateBtn}
-                  </button>
-                  <p className="mt-3 text-center text-sm font-semibold text-lab-ink/60">
-                    {userEmail ? `${t.creditsLeft}: ${credits}` : `${t.freeCredits}: ${freeCreditsLeft}`}
-                  </p>
-                </div>
-              )}
-
-              <button type="button" onClick={() => setStep(AppStep.UPLOAD)} className="rounded-md px-2 py-3 text-sm font-bold text-lab-teal transition-colors hover:bg-lab-mist">← {t.backToUpload || "Back to Upload"}</button>
-            </div>
-          </div>
-        );
-
       case AppStep.RESULT:
         return (
           <div className="mx-auto mb-16 flex max-w-[1120px] flex-col items-center gap-6 py-3 font-lab animate-in fade-in zoom-in-95 duration-500 sm:gap-8 sm:py-8 lg:gap-10">
             <div className="text-center">
-              <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-5xl">{selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoTitle || 'Restored Photo') : t.resultTitle}</h1>
-              <p className="mt-3 hidden text-sm font-semibold text-lab-teal sm:block">{selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? (t.restoredPhotoBadge || 'AI Photo Restoration') : t.uploadTitle}</p>
+              <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-5xl">{t.restoredPhotoTitle || 'Restored Photo'}</h1>
+              <p className="mt-3 hidden text-sm font-semibold text-lab-teal sm:block">{t.restoredPhotoBadge || 'AI Photo Restoration'}</p>
             </div>
 
             <div className="flex w-full flex-col items-center gap-4">
@@ -754,7 +558,7 @@ const App: React.FC = () => {
                   className="mx-auto h-auto max-h-[420px] w-auto max-w-full object-contain transition-opacity duration-300 sm:max-h-none sm:w-full"
                 />
                 <div className="absolute right-3 top-3 z-20 rounded-md bg-lab-ink px-4 py-2 text-xs font-bold text-white sm:right-5 sm:top-5">
-                  {showOriginal ? t.originalPhoto : (selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO ? t.demoAfter : t.resultTitle)}
+                  {showOriginal ? t.originalPhoto : t.demoAfter}
                 </div>
 
                 {!showOriginal && (
@@ -864,7 +668,7 @@ const App: React.FC = () => {
         return (
           <div className="mx-auto mb-16 flex max-w-5xl flex-col items-center gap-8 py-6 font-lab animate-in fade-in zoom-in-95 duration-500">
             <div className="text-center">
-              <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-5xl">{t.historyTitle || 'My Portraits'}</h1>
+              <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-5xl">{t.historyTitle || 'My Restored Photos'}</h1>
               <p className="mt-3 text-sm font-semibold text-lab-ink/55">
                 {userEmail ? userEmail : ''}
               </p>
@@ -878,7 +682,7 @@ const App: React.FC = () => {
             ) : historyItems.length === 0 ? (
               <div className="w-full rounded-lg border border-lab-line bg-white px-6 py-14 text-center sm:p-16">
                 <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-md bg-lab-mist text-lab-teal"><ICONS.Camera /></div>
-                <p className="mb-8 text-lg text-lab-ink/70">{t.historyEmpty || "You don't have any generated portraits yet."}</p>
+                <p className="mb-8 text-lg text-lab-ink/70">{t.historyEmpty || "You don't have any restored photos yet."}</p>
                 <button
                   type="button"
                   onClick={() => setStep(AppStep.UPLOAD)}
@@ -914,7 +718,7 @@ const App: React.FC = () => {
                           const url = URL.createObjectURL(blob);
                           const a = document.createElement('a');
                           a.href = url;
-                          a.download = `portrait-${item.id}.jpg`;
+                          a.download = `restored-photo-${item.id}.jpg`;
                           a.click();
                           URL.revokeObjectURL(url);
                         }}
@@ -941,7 +745,6 @@ const App: React.FC = () => {
       <Header
         language={language}
         onLanguageChange={setLanguage}
-        mode={isRestoreMode ? 'restore' : 'studio'}
         credits={userEmail ? credits : freeCreditsLeft}
         showCredits={Boolean(userEmail || freeGenerationsUsed > 0)}
         userEmail={userEmail}
@@ -980,15 +783,14 @@ const App: React.FC = () => {
       <footer className="mt-auto bg-lab-ink px-4 py-10 text-white sm:px-6">
         <div className="mx-auto grid max-w-[1200px] gap-8 md:grid-cols-[1.2fr_0.8fr_1fr]">
           <div>
-            <a href={isRestoreMode ? '/restore' : '/'} className="text-xl font-extrabold">ShotMe<span className="text-lab-coral">.ee</span></a>
+            <a href="/" className="text-xl font-extrabold">ShotMe<span className="text-lab-coral">.ee</span></a>
             <p className="mt-3 text-sm font-semibold text-[#d8ece6]">LihtneAI OÜ</p>
             <p className="mt-2 max-w-sm text-xs leading-5 text-[#d8ece6]/70">{TRANSLATIONS[language]?.deleteDataMsg || 'To delete your images and data, write to oleg@lihtneai.ee'}</p>
           </div>
           <nav className="flex flex-col items-start gap-3 text-sm font-semibold text-[#d8ece6]" aria-label="Footer">
-            <a href="/restore" className="hover:text-white">{TRANSLATIONS[language].restoreOldPhoto}</a>
-            <a href="/" className="hover:text-white">{TRANSLATIONS[language].uploadTitle}</a>
-            <a href={`${isRestoreMode ? '/restore' : '/'}#pricing`} className="hover:text-white">{LANDING_CONTENT[language].pricingTitle}</a>
-            <a href={`${isRestoreMode ? '/restore' : '/'}#faq`} className="hover:text-white">FAQ</a>
+            <a href="/" className="hover:text-white">{TRANSLATIONS[language].restoreOldPhoto}</a>
+            <a href="/#pricing" className="hover:text-white">{LANDING_CONTENT[language].pricingTitle}</a>
+            <a href="/#faq" className="hover:text-white">FAQ</a>
           </nav>
           <div className="flex flex-col items-start gap-3 text-sm">
             <a href="mailto:oleg@lihtneai.ee" className="font-semibold text-white hover:text-lab-coral">oleg@lihtneai.ee</a>

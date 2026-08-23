@@ -2,14 +2,12 @@ import React from 'react';
 import { ICONS } from '../constants';
 import { LANDING_CONTENT } from '../landingContent';
 import { TRANSLATIONS } from '../translations';
-import { Language, PhotoStyle } from '../types';
+import { Language } from '../types';
 import BeforeAfter from './BeforeAfter';
 
 interface LandingSectionsProps {
   language: Language;
-  isRestoreMode: boolean;
   onUpload: () => void;
-  onSelectStyle: (style: PhotoStyle) => void;
   onShowPricing: () => void;
 }
 
@@ -17,7 +15,6 @@ const SOURCE_LINKS = {
   restoreMain: 'https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg',
   restoreFamily: 'https://commons.wikimedia.org/wiki/File:1895_Boston_family_portrait.jpg',
   restoreDoty: 'https://commons.wikimedia.org/wiki/File:Daguerreotype_of_The_Doty_Family_by_Robert_Peckham.jpg',
-  studio: 'https://unsplash.com/photos/woman-taking-selfie-uCPukEwJ6TM',
 };
 
 const GENERATIONS: Record<Language, string> = {
@@ -37,18 +34,11 @@ const CheckIcon = () => (
 
 const LandingSections: React.FC<LandingSectionsProps> = ({
   language,
-  isRestoreMode,
   onUpload,
-  onSelectStyle,
   onShowPricing,
 }) => {
   const copy = LANDING_CONTENT[language];
   const t = TRANSLATIONS[language];
-  const studioModes = [
-    { id: PhotoStyle.CLASSIC_STUDIO, image: '/examples/studio-classic-after.webp', title: t.classicStudio, description: t.classicStudioDesc },
-    { id: PhotoStyle.FASHION_EDITORIAL, image: '/examples/studio-editorial-after.webp', title: t.fashionEditorial, description: t.fashionEditorialDesc },
-    { id: PhotoStyle.BUSINESS_LUXE, image: '/examples/studio-office-after.webp', title: t.businessLuxe, description: t.businessLuxeDesc },
-  ];
   const restoreExamples = [
     {
       before: '/demo/restoration-before.webp',
@@ -72,53 +62,17 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
       objectPosition: 'center',
     },
   ];
-  const studioExamples = studioModes.map((mode, index) => ({
-    before: '/examples/studio-selfie-before.webp',
-    after: mode.image,
-    title: copy.studioExamples[index],
-    source: SOURCE_LINKS.studio,
-    objectPosition: 'center',
-  }));
-  const examples = isRestoreMode ? restoreExamples : studioExamples;
-  const processImages = isRestoreMode
-    ? ['/demo/restoration-before.webp', '/examples/restore-family-1895-after.webp', '/demo/restoration-after.webp']
-    : ['/examples/studio-selfie-before.webp', '/examples/studio-editorial-after.webp', '/examples/studio-classic-after.webp'];
+  const examples = restoreExamples;
+  const processImages = ['/demo/restoration-before.webp', '/examples/restore-family-1895-after.webp', '/demo/restoration-after.webp'];
 
   return (
     <>
-      {!isRestoreMode && (
-        <section className="bg-lab-paper px-4 py-14 sm:px-6 sm:py-20">
-          <div className="mx-auto max-w-[1200px]">
-            <div className="max-w-2xl">
-              <h2 className="text-balance text-3xl font-extrabold leading-tight text-lab-ink sm:text-5xl">{copy.modeTitle}</h2>
-              <p className="mt-4 max-w-[65ch] text-base leading-7 text-lab-ink/70 sm:text-lg">{copy.modeIntro}</p>
-            </div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              {studioModes.map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  onClick={() => onSelectStyle(mode.id)}
-                  className="group overflow-hidden rounded-lg border border-lab-line bg-white text-left transition-[border-color,transform] hover:-translate-y-1 hover:border-lab-teal focus-visible:border-lab-teal"
-                >
-                  <img src={mode.image} alt={mode.title} loading="lazy" className="aspect-[4/5] w-full object-cover object-top" />
-                  <span className="block px-5 py-5">
-                    <span className="block text-lg font-extrabold text-lab-ink">{mode.title}</span>
-                    <span className="mt-2 block text-sm leading-5 text-lab-ink/65">{mode.description}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
       <section id="examples" className="bg-white px-4 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
             <div className="max-w-3xl">
               <h2 className="text-balance text-3xl font-extrabold leading-tight text-lab-ink sm:text-5xl">
-                {isRestoreMode ? copy.galleryRestoreTitle : copy.galleryStudioTitle}
+                {copy.galleryRestoreTitle}
               </h2>
               <p className="mt-4 max-w-[70ch] text-base leading-7 text-lab-ink/70">{copy.galleryIntro}</p>
             </div>
@@ -259,10 +213,10 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
       <section className="bg-white px-4 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto flex max-w-[1200px] flex-col items-start justify-between gap-7 border-y border-lab-line py-10 md:flex-row md:items-center">
           <h2 className="max-w-3xl text-balance text-3xl font-extrabold leading-tight text-lab-ink sm:text-5xl">
-            {isRestoreMode ? copy.finalRestoreTitle : copy.finalStudioTitle}
+            {copy.finalRestoreTitle}
           </h2>
           <button type="button" onClick={onUpload} className="flex min-h-14 w-full shrink-0 items-center justify-center gap-3 rounded-md bg-lab-coral px-6 py-4 text-base font-extrabold text-lab-ink transition-colors hover:bg-lab-ink hover:text-white md:w-auto">
-            <ICONS.Camera /> {isRestoreMode ? copy.finalRestoreCta : copy.finalStudioCta}
+            <ICONS.Camera /> {copy.finalRestoreCta}
           </button>
         </div>
       </section>

@@ -6,7 +6,6 @@ export interface ProcessingState {
 
 export enum AppStep {
   UPLOAD = 'UPLOAD',
-  CHOOSE_STYLE = 'CHOOSE_STYLE',
   RESULT = 'RESULT',
   HISTORY = 'HISTORY'
 }
@@ -21,10 +20,7 @@ export enum Language {
 }
 
 export enum PhotoStyle {
-  RESTORE_OLD_PHOTO = 'RESTORE_OLD_PHOTO',
-  CLASSIC_STUDIO = 'CLASSIC_STUDIO',
-  FASHION_EDITORIAL = 'FASHION_EDITORIAL',
-  BUSINESS_LUXE = 'BUSINESS_LUXE'
+  RESTORE_OLD_PHOTO = 'RESTORE_OLD_PHOTO'
 }
 
 export type AspectRatio = '9:16' | '16:9';

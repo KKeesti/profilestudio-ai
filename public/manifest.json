@@ -1,14 +1,14 @@
 {
   "name": "ShotMe.ee",
   "short_name": "ShotMe",
-  "description": "AI photo studio for portraits and old photo restoration.",
+  "description": "Restore damage, clarity, and period-appropriate color in old family photos.",
   "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],
-  "background_color": "#05070a",
-  "theme_color": "#05070a",
+  "background_color": "#f4f7f5",
+  "theme_color": "#15302b",
   "orientation": "portrait-primary",
   "categories": ["photo", "productivity", "utilities"],
   "icons": [
@@ -38,22 +38,10 @@
   ],
   "shortcuts": [
     {
-      "name": "Create portrait",
-      "short_name": "Portrait",
-      "description": "Upload a photo and generate a portrait.",
-      "url": "/?action=portrait",
-      "icons": [
-        {
-          "src": "/icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
       "name": "Restore old photo",
       "short_name": "Restore",
       "description": "Restore and colorize an old photo.",
-      "url": "/?action=restore",
+      "url": "/",
       "icons": [
         {
           "src": "/icons/icon-192.png",

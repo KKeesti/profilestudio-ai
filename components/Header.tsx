@@ -5,7 +5,6 @@ import { TRANSLATIONS } from '../translations';
 interface HeaderProps {
   language: Language;
   onLanguageChange?: (language: Language) => void;
-  mode?: 'studio' | 'restore';
   credits?: number;
   showCredits?: boolean;
   hasGallery?: boolean;
@@ -27,7 +26,6 @@ const SIGN_OUT: Record<Language, string> = {
 const Header: React.FC<HeaderProps> = ({
   language,
   onLanguageChange,
-  mode = 'studio',
   credits = 0,
   showCredits = false,
   hasGallery = false,
@@ -49,26 +47,9 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 border-b border-lab-line bg-lab-white font-lab text-lab-ink">
       <div className="mx-auto flex min-h-16 w-full max-w-[1200px] items-center gap-3 px-4 sm:px-6">
-        <a href={mode === 'restore' ? '/restore' : '/'} className="shrink-0 text-xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-2xl">
+        <a href="/" className="shrink-0 text-xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-2xl">
           ShotMe<span className="text-lab-coral">.ee</span>
         </a>
-
-        <nav className="ml-5 hidden items-center gap-6 md:flex" aria-label="Photo modes">
-          <a
-            href="/restore"
-            aria-current={mode === 'restore' ? 'page' : undefined}
-            className={`border-b-2 py-2 text-sm font-semibold transition-colors ${mode === 'restore' ? 'border-lab-teal text-lab-ink' : 'border-transparent text-lab-ink/65 hover:text-lab-ink'}`}
-          >
-            {t.restoreOldPhoto}
-          </a>
-          <a
-            href="/"
-            aria-current={mode === 'studio' ? 'page' : undefined}
-            className={`border-b-2 py-2 text-sm font-semibold transition-colors ${mode === 'studio' ? 'border-lab-teal text-lab-ink' : 'border-transparent text-lab-ink/65 hover:text-lab-ink'}`}
-          >
-            {t.uploadTitle}
-          </a>
-        </nav>
 
         <div className="ml-auto flex min-w-0 items-center gap-2">
           {userEmail && hasGallery && onViewHistory && (
@@ -128,10 +109,6 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <nav className="flex border-t border-lab-line px-4 md:hidden" aria-label="Photo modes mobile">
-        <a href="/restore" className={`flex-1 border-b-2 px-2 py-3 text-center text-xs font-bold ${mode === 'restore' ? 'border-lab-teal text-lab-ink' : 'border-transparent text-lab-ink/60'}`}>{t.restoreOldPhoto}</a>
-        <a href="/" className={`flex-1 border-b-2 px-2 py-3 text-center text-xs font-bold ${mode === 'studio' ? 'border-lab-teal text-lab-ink' : 'border-transparent text-lab-ink/60'}`}>{t.uploadTitle}</a>
-      </nav>
     </header>
   );
 };

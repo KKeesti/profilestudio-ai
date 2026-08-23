@@ -2,15 +2,15 @@
 
 ## Product Thesis
 
-ShotMe.ee is a trusted photo lab for people who want one useful result quickly: restore an important family photograph or create a natural portrait. The interface should lead with a real result, make uploading unmistakable, and reduce the path to completion to a few clear actions.
+ShotMe.ee is a trusted photo lab for people who want one useful result quickly: restore an important family photograph. The interface should lead with a real result, make uploading unmistakable, and reduce the path to completion to a few clear actions.
 
 ## Experience Principles
 
 1. **Action first.** The main upload action belongs in the first viewport on every supported screen.
 2. **Proof before explanation.** Show a real, clearly labelled before/after example before secondary product detail.
 3. **Trust is part of the task.** Face preservation, original-file safety, and a visible result before payment appear near the upload action.
-4. **Free stays simple.** Free users choose a mode and generate. Text and voice refinements are paid controls.
-5. **One route, one intent.** `/restore` starts restoration automatically after upload. The main studio route offers a small set of result-oriented modes.
+4. **Free stays simple.** Upload starts restoration automatically. Text and voice refinements are paid controls.
+5. **One product, one intent.** Both `/` and the legacy `/restore` link open the same restoration experience.
 
 ## Visual World
 
@@ -47,7 +47,7 @@ Use opaque colors. Gradients and decorative color blobs are not part of this sys
 ## Action Hierarchy
 
 1. Coral with ink text: upload, restore, download. Use white text only after the background changes to ink.
-2. Teal: selected modes, navigation state, and trust confirmation.
+2. Teal: navigation state and trust confirmation.
 3. White with border: secondary actions such as replace image, show original, and go back.
 
 All primary touch targets should be at least 48px high. Icon-only controls require an accessible name and tooltip where their meaning is not universal.
@@ -55,7 +55,7 @@ All primary touch targets should be at least 48px high. Icon-only controls requi
 ## Responsive Rules
 
 - At 320px wide, the real before/after proof, headline, upload button, and free-use statement must fit in the first 568px viewport.
-- Mobile headers use two rows: identity and account controls first, intent navigation second.
+- Mobile headers keep identity, account controls, and language selection in one compact row.
 - Results use a constrained image height on mobile so download and back actions remain easy to reach.
 - Content must never create horizontal overflow at 320, 390, 768, or 1440px widths.
 - Desktop may use split layouts, but the upload action remains visible without scrolling.
@@ -63,7 +63,6 @@ All primary touch targets should be at least 48px high. Icon-only controls requi
 ## Product States
 
 - **Upload:** intent, proof, primary action, free-use statement, trust promises.
-- **Choose mode:** uploaded preview, replace action, aspect ratio, mode cards.
 - **Processing:** clear task-specific status without blocking browser-native alerts.
 - **Result:** generated image, show-original control, download, return to upload.
 - **Free gate:** request email only after ten free generations.
@@ -79,10 +78,8 @@ All primary touch targets should be at least 48px high. Icon-only controls requi
 
 ## Landing Page Structure
 
-- The main route sells one result: a professional portrait from one selfie.
-- `/restore` sells one result: careful restoration and optional period-aware colorization.
-- The studio hero pairs its upload action with a draggable comparison. The restoration hero uses a short, muted morph video with native playback controls and keeps draggable comparisons in the evidence gallery.
-- Mode cards use neutral surfaces and real result previews. Selection is shown with a teal border and checkmark.
+- The main route and `/restore` sell one result: careful restoration with period-aware colorization.
+- The hero pairs its upload action with a short, muted morph video with native playback controls and keeps draggable comparisons in the evidence gallery.
 - Evidence follows the hero in this order: real examples, three-step process, visible one-time pricing, privacy, FAQ, and a final upload action.
 - Example captions identify the task and link to the original source when one is available.
-- The footer exposes both product routes, pricing, help, legal pages, and the operating company.
+- The footer exposes restoration, pricing, help, legal pages, and the operating company.

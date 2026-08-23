@@ -30,7 +30,6 @@ type FunnelProperties = {
 
 const STEP_NAMES: Partial<Record<AppStep, string>> = {
   [AppStep.UPLOAD]: 'upload',
-  [AppStep.CHOOSE_STYLE]: 'choose_style',
   [AppStep.RESULT]: 'result',
   [AppStep.HISTORY]: 'history',
 };
@@ -104,9 +103,7 @@ export function trackFunnel(event: FunnelEvent, properties: FunnelProperties = {
     plan: properties.plan,
     depth: properties.depth,
     device: getDevice(),
-    surface: window.location.pathname.replace(/\/+$/, '') === '/restore' || new URLSearchParams(window.location.search).get('mode') === 'restore'
-      ? 'restore'
-      : 'studio',
+    surface: 'restore',
     ...getAttribution(),
   });
 

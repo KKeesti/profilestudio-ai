@@ -1,18 +1,11 @@
 import { Language } from './types';
 
 interface LandingCopy {
-  studioHeroTitle: string;
-  studioHeroDesc: string;
-  studioHeroCta: string;
-  modeTitle: string;
-  modeIntro: string;
   galleryRestoreTitle: string;
-  galleryStudioTitle: string;
   galleryIntro: string;
   realResults: string;
   compareLabel: string;
   restoreExamples: string[];
-  studioExamples: string[];
   howTitle: string;
   howIntro: string;
   steps: Array<{ title: string; description: string }>;
@@ -29,9 +22,7 @@ interface LandingCopy {
   faqTitle: string;
   faqs: Array<{ question: string; answer: string }>;
   finalRestoreTitle: string;
-  finalStudioTitle: string;
   finalRestoreCta: string;
-  finalStudioCta: string;
   sourcePhoto: string;
   startFree: string;
   choosePackage: string;
@@ -39,23 +30,16 @@ interface LandingCopy {
 
 export const LANDING_CONTENT: Record<Language, LandingCopy> = {
   [Language.EN]: {
-    studioHeroTitle: 'A professional portrait from one selfie',
-    studioHeroDesc: 'Create a natural profile photo for work, LinkedIn, or social media without booking a photo session.',
-    studioHeroCta: 'Create my portrait free',
-    modeTitle: 'What portrait do you need?',
-    modeIntro: 'Choose by the result, then upload a selfie. Free processing starts immediately.',
     galleryRestoreTitle: 'Real restoration results',
-    galleryStudioTitle: 'One selfie, different professional results',
     galleryIntro: 'These examples were created by ShotMe from licensed source photographs. Drag the divider to compare.',
     realResults: 'Created with ShotMe',
     compareLabel: 'Move the divider to compare before and after',
     restoreExamples: ['Faded studio portrait', 'Family portrait from 1895', 'Daguerreotype from the 1850s'],
-    studioExamples: ['Natural studio', 'Elegant editorial', 'Office portrait'],
     howTitle: 'From photo to result in three steps',
     howIntro: 'No editor, prompt, or special skill is required in the free version.',
     steps: [
       { title: 'Upload a photo', description: 'Choose an image from your phone or computer.' },
-      { title: 'Choose the result', description: 'Pick restoration or the portrait style you need.' },
+      { title: 'Automatic restoration', description: 'ShotMe repairs damage, restores clarity, and adds period-aware color.' },
       { title: 'Download', description: 'Review the finished image and save it to your device.' },
     ],
     pricingTitle: 'Clear pricing before you start',
@@ -76,31 +60,22 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
       { question: 'What if I do not like the result?', answer: 'Use another free attempt with a clearer source. Failed or blocked processing attempts are not deducted.' },
     ],
     finalRestoreTitle: 'Bring an important family photograph back to life',
-    finalStudioTitle: 'Get a profile photo you can use today',
     finalRestoreCta: 'Restore my photo free',
-    finalStudioCta: 'Create my portrait free',
     sourcePhoto: 'Source photo',
     startFree: 'Start free',
     choosePackage: 'Choose package',
   },
   [Language.ET]: {
-    studioHeroTitle: 'Professionaalne portree ühest selfist',
-    studioHeroDesc: 'Loo loomulik profiilipilt tööks, LinkedIni või sotsiaalmeediasse ilma fotosessioonita.',
-    studioHeroCta: 'Loo minu portree tasuta',
-    modeTitle: 'Millist portreed vajad?',
-    modeIntro: 'Vali tulemus pildi järgi ja laadi selfie üles. Tasuta töötlemine algab kohe.',
     galleryRestoreTitle: 'Päris taastamistulemused',
-    galleryStudioTitle: 'Üks selfie, erinevad professionaalsed tulemused',
     galleryIntro: 'Need näited lõi ShotMe litsentsitud algfotodest. Võrdlemiseks liiguta eraldusjoont.',
     realResults: 'Loodud ShotMe abil',
     compareLabel: 'Liiguta joont, et võrrelda enne ja pärast',
     restoreExamples: ['Pleekinud stuudioportree', 'Pereportree aastast 1895', '1850. aastate dagerrotüüp'],
-    studioExamples: ['Loomulik stuudio', 'Elegantne editorial', 'Kontoriportree'],
     howTitle: 'Fotost tulemuseni kolme sammuga',
     howIntro: 'Tasuta versioonis pole vaja fototöötlust, prompti ega erioskusi.',
     steps: [
       { title: 'Laadi foto üles', description: 'Vali pilt telefonist või arvutist.' },
-      { title: 'Vali tulemus', description: 'Vali taastamine või sobiv portreestiil.' },
+      { title: 'Automaatne taastamine', description: 'ShotMe parandab kahjustused, taastab teravuse ja lisab ajastutruud värvid.' },
       { title: 'Laadi alla', description: 'Vaata tulemus üle ja salvesta see seadmesse.' },
     ],
     pricingTitle: 'Selge hind enne alustamist',
@@ -121,31 +96,22 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
       { question: 'Mis siis, kui tulemus ei meeldi?', answer: 'Proovi selgema algfotoga uuesti. Ebaõnnestunud või blokeeritud katset ei arvestata maha.' },
     ],
     finalRestoreTitle: 'Anna olulisele perefotole uus elu',
-    finalStudioTitle: 'Loo profiilipilt, mida saad kasutada juba täna',
     finalRestoreCta: 'Taasta minu foto tasuta',
-    finalStudioCta: 'Loo minu portree tasuta',
     sourcePhoto: 'Algfoto',
     startFree: 'Alusta tasuta',
     choosePackage: 'Vali pakett',
   },
   [Language.RU]: {
-    studioHeroTitle: 'Деловой портрет из одного селфи',
-    studioHeroDesc: 'Создайте естественное фото для работы, LinkedIn или соцсетей без записи к фотографу.',
-    studioHeroCta: 'Создать мой портрет бесплатно',
-    modeTitle: 'Какой портрет вам нужен?',
-    modeIntro: 'Выберите результат по фотографии и загрузите селфи. Бесплатная обработка начнётся сразу.',
     galleryRestoreTitle: 'Настоящие результаты восстановления',
-    galleryStudioTitle: 'Одно селфи, разные профессиональные результаты',
     galleryIntro: 'Эти примеры созданы в ShotMe из лицензированных исходных фотографий. Передвигайте линию для сравнения.',
     realResults: 'Создано в ShotMe',
     compareLabel: 'Передвигайте линию, чтобы сравнить до и после',
     restoreExamples: ['Выцветший студийный портрет', 'Семейный портрет 1895 года', 'Дагерротип 1850-х годов'],
-    studioExamples: ['Естественная студия', 'Элегантный editorial', 'Офисный портрет'],
     howTitle: 'От фотографии до результата за три шага',
     howIntro: 'В бесплатной версии не нужен редактор, текстовый запрос или специальные навыки.',
     steps: [
       { title: 'Загрузите фотографию', description: 'Выберите снимок на телефоне или компьютере.' },
-      { title: 'Выберите результат', description: 'Укажите восстановление или нужный стиль портрета.' },
+      { title: 'Автоматическое восстановление', description: 'ShotMe убирает повреждения, возвращает чёткость и добавляет цвета эпохи.' },
       { title: 'Скачайте', description: 'Проверьте готовое изображение и сохраните его на устройство.' },
     ],
     pricingTitle: 'Понятная цена до начала работы',
@@ -166,31 +132,22 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
       { question: 'Что делать, если результат не понравился?', answer: 'Попробуйте ещё раз с более чётким исходником. Неудачная или заблокированная обработка не списывается.' },
     ],
     finalRestoreTitle: 'Верните к жизни важную семейную фотографию',
-    finalStudioTitle: 'Получите портрет, который можно использовать сегодня',
     finalRestoreCta: 'Восстановить моё фото бесплатно',
-    finalStudioCta: 'Создать мой портрет бесплатно',
     sourcePhoto: 'Исходная фотография',
     startFree: 'Начать бесплатно',
     choosePackage: 'Выбрать пакет',
   },
   [Language.LV]: {
-    studioHeroTitle: 'Profesionāls portrets no viena pašfoto',
-    studioHeroDesc: 'Izveidojiet dabisku profila foto darbam, LinkedIn vai sociālajiem tīkliem bez fotosesijas.',
-    studioHeroCta: 'Izveidot manu portretu bez maksas',
-    modeTitle: 'Kāds portrets jums vajadzīgs?',
-    modeIntro: 'Izvēlieties rezultātu pēc attēla un augšupielādējiet pašfoto. Bezmaksas apstrāde sāksies uzreiz.',
     galleryRestoreTitle: 'Īsti atjaunošanas rezultāti',
-    galleryStudioTitle: 'Viens pašfoto, dažādi profesionāli rezultāti',
     galleryIntro: 'Šos piemērus ShotMe izveidoja no licencētiem avota foto. Velciet dalītāju, lai salīdzinātu.',
     realResults: 'Izveidots ar ShotMe',
     compareLabel: 'Velciet līniju, lai salīdzinātu pirms un pēc',
     restoreExamples: ['Izbalējis studijas portrets', 'Ģimenes portrets no 1895. gada', '1850. gadu dagerotips'],
-    studioExamples: ['Dabiska studija', 'Elegants editorial', 'Biroja portrets'],
     howTitle: 'No foto līdz rezultātam trīs soļos',
     howIntro: 'Bezmaksas versijā nav vajadzīgs redaktors, teksta pieprasījums vai īpašas prasmes.',
     steps: [
       { title: 'Augšupielādējiet foto', description: 'Izvēlieties attēlu tālrunī vai datorā.' },
-      { title: 'Izvēlieties rezultātu', description: 'Norādiet atjaunošanu vai vajadzīgo portreta stilu.' },
+      { title: 'Automātiska atjaunošana', description: 'ShotMe novērš bojājumus, atjauno asumu un pievieno laikmetam atbilstošas krāsas.' },
       { title: 'Lejupielādējiet', description: 'Pārbaudiet gatavo attēlu un saglabājiet to ierīcē.' },
     ],
     pricingTitle: 'Skaidra cena pirms darba sākuma',
@@ -211,31 +168,22 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
       { question: 'Ko darīt, ja rezultāts nepatīk?', answer: 'Mēģiniet vēlreiz ar skaidrāku foto. Neveiksmīgs vai bloķēts mēģinājums netiek atskaitīts.' },
     ],
     finalRestoreTitle: 'Atdzīviniet svarīgu ģimenes fotogrāfiju',
-    finalStudioTitle: 'Iegūstiet portretu, ko varat izmantot jau šodien',
     finalRestoreCta: 'Atjaunot manu foto bez maksas',
-    finalStudioCta: 'Izveidot manu portretu bez maksas',
     sourcePhoto: 'Avota foto',
     startFree: 'Sākt bez maksas',
     choosePackage: 'Izvēlēties paketi',
   },
   [Language.LT]: {
-    studioHeroTitle: 'Profesionalus portretas iš vienos asmenukės',
-    studioHeroDesc: 'Sukurkite natūralią profilio nuotrauką darbui, LinkedIn ar socialiniams tinklams be fotosesijos.',
-    studioHeroCta: 'Sukurti mano portretą nemokamai',
-    modeTitle: 'Kokio portreto jums reikia?',
-    modeIntro: 'Pasirinkite rezultatą pagal nuotrauką ir įkelkite asmenukę. Nemokamas apdorojimas prasidės iš karto.',
     galleryRestoreTitle: 'Tikri atkūrimo rezultatai',
-    galleryStudioTitle: 'Viena asmenukė, skirtingi profesionalūs rezultatai',
     galleryIntro: 'Šiuos pavyzdžius ShotMe sukūrė iš licencijuotų pradinių nuotraukų. Vilkite skirtuką ir palyginkite.',
     realResults: 'Sukurta su ShotMe',
     compareLabel: 'Vilkite liniją ir palyginkite prieš bei po',
     restoreExamples: ['Išblukęs studijos portretas', '1895 metų šeimos portretas', '1850-ųjų dagerotipas'],
-    studioExamples: ['Natūrali studija', 'Elegantiškas editorial', 'Biuro portretas'],
     howTitle: 'Nuo nuotraukos iki rezultato per tris žingsnius',
     howIntro: 'Nemokamoje versijoje nereikia redaktoriaus, teksto užklausos ar specialių įgūdžių.',
     steps: [
       { title: 'Įkelkite nuotrauką', description: 'Pasirinkite vaizdą telefone arba kompiuteryje.' },
-      { title: 'Pasirinkite rezultatą', description: 'Nurodykite atkūrimą arba norimą portreto stilių.' },
+      { title: 'Automatinis atkūrimas', description: 'ShotMe pašalina pažeidimus, atkuria ryškumą ir prideda laikmetį atitinkančias spalvas.' },
       { title: 'Atsisiųskite', description: 'Peržiūrėkite rezultatą ir išsaugokite jį įrenginyje.' },
     ],
     pricingTitle: 'Aiški kaina prieš pradedant',
@@ -256,31 +204,22 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
       { question: 'Ką daryti, jei rezultatas nepatinka?', answer: 'Bandykite dar kartą su aiškesne nuotrauka. Nesėkmingas ar užblokuotas bandymas nenuskaičiuojamas.' },
     ],
     finalRestoreTitle: 'Atgaivinkite svarbią šeimos nuotrauką',
-    finalStudioTitle: 'Gaukite portretą, kurį galite naudoti šiandien',
     finalRestoreCta: 'Atkurti mano nuotrauką nemokamai',
-    finalStudioCta: 'Sukurti mano portretą nemokamai',
     sourcePhoto: 'Pradinė nuotrauka',
     startFree: 'Pradėti nemokamai',
     choosePackage: 'Pasirinkti paketą',
   },
   [Language.FI]: {
-    studioHeroTitle: 'Ammattimainen muotokuva yhdestä selfiestä',
-    studioHeroDesc: 'Luo luonnollinen profiilikuva työhön, LinkedIniin tai someen ilman valokuvausaikaa.',
-    studioHeroCta: 'Luo muotokuvani ilmaiseksi',
-    modeTitle: 'Millaisen muotokuvan tarvitset?',
-    modeIntro: 'Valitse tulos kuvan perusteella ja lataa selfie. Ilmainen käsittely alkaa heti.',
     galleryRestoreTitle: 'Aitoja entisöintituloksia',
-    galleryStudioTitle: 'Yksi selfie, erilaisia ammattimaisia tuloksia',
     galleryIntro: 'ShotMe loi nämä esimerkit lisensoiduista lähdekuvista. Vertaa vetämällä jakajaa.',
     realResults: 'Luotu ShotMellä',
     compareLabel: 'Vertaa ennen ja jälkeen vetämällä viivaa',
     restoreExamples: ['Haalistunut studiomuotokuva', 'Perhepotretti vuodelta 1895', '1850-luvun dagerrotyyppi'],
-    studioExamples: ['Luonnollinen studio', 'Tyylikäs editorial', 'Toimistomuotokuva'],
     howTitle: 'Kuvasta tulokseen kolmessa vaiheessa',
     howIntro: 'Ilmaisversiossa et tarvitse editoria, tekstikehotetta tai erityistaitoja.',
     steps: [
       { title: 'Lataa valokuva', description: 'Valitse kuva puhelimesta tai tietokoneelta.' },
-      { title: 'Valitse tulos', description: 'Valitse entisöinti tai tarvitsemasi muotokuvatyyli.' },
+      { title: 'Automaattinen entisöinti', description: 'ShotMe korjaa vauriot, palauttaa terävyyden ja lisää aikakauteen sopivat värit.' },
       { title: 'Lataa tulos', description: 'Tarkista valmis kuva ja tallenna se laitteellesi.' },
     ],
     pricingTitle: 'Selkeä hinta ennen aloittamista',
@@ -301,9 +240,7 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
       { question: 'Entä jos en pidä tuloksesta?', answer: 'Yritä uudelleen selkeämmällä lähdekuvalla. Epäonnistunutta tai estettyä käsittelyä ei vähennetä.' },
     ],
     finalRestoreTitle: 'Herätä tärkeä perhekuva uudelleen eloon',
-    finalStudioTitle: 'Hanki profiilikuva, jota voit käyttää jo tänään',
     finalRestoreCta: 'Palauta kuvani ilmaiseksi',
-    finalStudioCta: 'Luo muotokuvani ilmaiseksi',
     sourcePhoto: 'Lähdekuva',
     startFree: 'Aloita ilmaiseksi',
     choosePackage: 'Valitse paketti',
