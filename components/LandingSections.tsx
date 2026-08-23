@@ -14,7 +14,6 @@ interface LandingSectionsProps {
 const SOURCE_LINKS = {
   restoreMain: 'https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg',
   restoreFamily: 'https://commons.wikimedia.org/wiki/File:1895_Boston_family_portrait.jpg',
-  restoreDoty: 'https://commons.wikimedia.org/wiki/File:Daguerreotype_of_The_Doty_Family_by_Robert_Peckham.jpg',
 };
 
 const GENERATIONS: Record<Language, string> = {
@@ -55,10 +54,9 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
       objectPosition: 'center',
     },
     {
-      before: '/examples/restore-doty-before.webp',
-      after: '/examples/restore-doty-after.webp',
+      before: '/examples/restore-family-1940-before.png',
+      after: '/examples/restore-family-1940-after.png',
       title: copy.restoreExamples[2],
-      source: SOURCE_LINKS.restoreDoty,
       objectPosition: 'center',
     },
   ];
@@ -93,14 +91,16 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
                 />
                 <div className="mt-4 flex items-start justify-between gap-3">
                   <h3 className="text-lg font-extrabold text-lab-ink">{example.title}</h3>
-                  <a
-                    href={example.source}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 text-xs font-semibold text-lab-ink/55 underline decoration-lab-line underline-offset-4 hover:text-lab-teal"
-                  >
-                    {copy.sourcePhoto}
-                  </a>
+                  {example.source && (
+                    <a
+                      href={example.source}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 text-xs font-semibold text-lab-ink/55 underline decoration-lab-line underline-offset-4 hover:text-lab-teal"
+                    >
+                      {copy.sourcePhoto}
+                    </a>
+                  )}
                 </div>
               </article>
             ))}

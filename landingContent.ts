@@ -34,7 +34,7 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
     galleryIntro: 'These examples were created by ShotMe from licensed source photographs. Drag the divider to compare.',
     realResults: 'Created with ShotMe',
     compareLabel: 'Move the divider to compare before and after',
-    restoreExamples: ['Faded studio portrait', 'Family portrait from 1895', 'Daguerreotype from the 1850s'],
+    restoreExamples: ['Faded studio portrait', 'Family portrait from 1895', 'Family photograph from the 1940s'],
     howTitle: 'From photo to result in three steps',
     howIntro: 'No editor, prompt, or special skill is required in the free version.',
     steps: [
@@ -70,7 +70,7 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
     galleryIntro: 'Need näited lõi ShotMe litsentsitud algfotodest. Võrdlemiseks liiguta eraldusjoont.',
     realResults: 'Loodud ShotMe abil',
     compareLabel: 'Liiguta joont, et võrrelda enne ja pärast',
-    restoreExamples: ['Pleekinud stuudioportree', 'Pereportree aastast 1895', '1850. aastate dagerrotüüp'],
+    restoreExamples: ['Pleekinud stuudioportree', 'Pereportree aastast 1895', '1940. aastate perefoto'],
     howTitle: 'Fotost tulemuseni kolme sammuga',
     howIntro: 'Tasuta versioonis pole vaja fototöötlust, prompti ega erioskusi.',
     steps: [
@@ -106,7 +106,7 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
     galleryIntro: 'Эти примеры созданы в ShotMe из лицензированных исходных фотографий. Передвигайте линию для сравнения.',
     realResults: 'Создано в ShotMe',
     compareLabel: 'Передвигайте линию, чтобы сравнить до и после',
-    restoreExamples: ['Выцветший студийный портрет', 'Семейный портрет 1895 года', 'Дагерротип 1850-х годов'],
+    restoreExamples: ['Выцветший студийный портрет', 'Семейный портрет 1895 года', 'Семейное фото 1940-х годов'],
     howTitle: 'От фотографии до результата за три шага',
     howIntro: 'В бесплатной версии не нужен редактор, текстовый запрос или специальные навыки.',
     steps: [
@@ -142,7 +142,7 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
     galleryIntro: 'Šos piemērus ShotMe izveidoja no licencētiem avota foto. Velciet dalītāju, lai salīdzinātu.',
     realResults: 'Izveidots ar ShotMe',
     compareLabel: 'Velciet līniju, lai salīdzinātu pirms un pēc',
-    restoreExamples: ['Izbalējis studijas portrets', 'Ģimenes portrets no 1895. gada', '1850. gadu dagerotips'],
+    restoreExamples: ['Izbalējis studijas portrets', 'Ģimenes portrets no 1895. gada', '1940. gadu ģimenes foto'],
     howTitle: 'No foto līdz rezultātam trīs soļos',
     howIntro: 'Bezmaksas versijā nav vajadzīgs redaktors, teksta pieprasījums vai īpašas prasmes.',
     steps: [
@@ -178,7 +178,7 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
     galleryIntro: 'Šiuos pavyzdžius ShotMe sukūrė iš licencijuotų pradinių nuotraukų. Vilkite skirtuką ir palyginkite.',
     realResults: 'Sukurta su ShotMe',
     compareLabel: 'Vilkite liniją ir palyginkite prieš bei po',
-    restoreExamples: ['Išblukęs studijos portretas', '1895 metų šeimos portretas', '1850-ųjų dagerotipas'],
+    restoreExamples: ['Išblukęs studijos portretas', '1895 metų šeimos portretas', '1940-ųjų šeimos nuotrauka'],
     howTitle: 'Nuo nuotraukos iki rezultato per tris žingsnius',
     howIntro: 'Nemokamoje versijoje nereikia redaktoriaus, teksto užklausos ar specialių įgūdžių.',
     steps: [
@@ -214,7 +214,7 @@ export const LANDING_CONTENT: Record<Language, LandingCopy> = {
     galleryIntro: 'ShotMe loi nämä esimerkit lisensoiduista lähdekuvista. Vertaa vetämällä jakajaa.',
     realResults: 'Luotu ShotMellä',
     compareLabel: 'Vertaa ennen ja jälkeen vetämällä viivaa',
-    restoreExamples: ['Haalistunut studiomuotokuva', 'Perhepotretti vuodelta 1895', '1850-luvun dagerrotyyppi'],
+    restoreExamples: ['Haalistunut studiomuotokuva', 'Perhepotretti vuodelta 1895', '1940-luvun perhekuva'],
     howTitle: 'Kuvasta tulokseen kolmessa vaiheessa',
     howIntro: 'Ilmaisversiossa et tarvitse editoria, tekstikehotetta tai erityistaitoja.',
     steps: [
