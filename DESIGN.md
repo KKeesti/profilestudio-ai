@@ -81,7 +81,7 @@ All primary touch targets should be at least 48px high. Icon-only controls requi
 
 - The main route sells one result: a professional portrait from one selfie.
 - `/restore` sells one result: careful restoration and optional period-aware colorization.
-- Each hero pairs a single coral upload action with a draggable, labelled before/after example.
+- The studio hero pairs its upload action with a draggable comparison. The restoration hero uses a short, muted morph video with native playback controls and keeps draggable comparisons in the evidence gallery.
 - Mode cards use neutral surfaces and real result previews. Selection is shown with a teal border and checkmark.
 - Evidence follows the hero in this order: real examples, three-step process, visible one-time pricing, privacy, FAQ, and a final upload action.
 - Example captions identify the task and link to the original source when one is available.

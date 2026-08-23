@@ -6,6 +6,7 @@ import EmailModal from './components/EmailModal';
 import PaymentModal from './components/PaymentModal';
 import BeforeAfter from './components/BeforeAfter';
 import LandingSections from './components/LandingSections';
+import RestorationMorph from './components/RestorationMorph';
 import { GeminiService } from './services/geminiService';
 import { ICONS } from './constants';
 import { TRANSLATIONS } from './translations';
@@ -538,16 +539,25 @@ const App: React.FC = () => {
                   </p>
                 </div>
 
-                <BeforeAfter
-                  before={isRestoreMode ? '/demo/restoration-before.webp' : '/examples/studio-selfie-before.webp'}
-                  after={isRestoreMode ? '/demo/restoration-after.webp' : '/examples/studio-classic-after.webp'}
-                  beforeLabel={t.demoBefore}
-                  afterLabel={t.demoAfter}
-                  ariaLabel={landing.compareLabel}
-                  className="order-1 h-32 min-[360px]:h-44 lg:order-none lg:h-full lg:min-h-[640px]"
-                  objectPosition={isRestoreMode ? 'center top' : 'center'}
-                  loading="eager"
-                />
+                {isRestoreMode ? (
+                  <RestorationMorph
+                    beforeLabel={t.demoBefore}
+                    afterLabel={t.demoAfter}
+                    ariaLabel={landing.compareLabel}
+                    className="order-1 h-40 min-[360px]:h-60 lg:order-none lg:h-full lg:min-h-[640px]"
+                  />
+                ) : (
+                  <BeforeAfter
+                    before="/examples/studio-selfie-before.webp"
+                    after="/examples/studio-classic-after.webp"
+                    beforeLabel={t.demoBefore}
+                    afterLabel={t.demoAfter}
+                    ariaLabel={landing.compareLabel}
+                    className="order-1 h-32 min-[360px]:h-44 lg:order-none lg:h-full lg:min-h-[640px]"
+                    objectPosition="center"
+                    loading="eager"
+                  />
+                )}
               </div>
             </section>
 
