@@ -16,9 +16,12 @@ const TEXTS: Record<string, any> = {
         plan2: 'Профи',
         plan2Desc: '50 генераций',
         plan2Price: '10 €',
-        btn: 'Купить сейчас',
+        btn: 'Выбрать способ оплаты',
         best: 'Лучший выбор',
-        secure: 'Безопасная оплата через Stripe',
+        paymentTitle: 'Оплата привычным способом',
+        paymentDescription: 'Выберите доступный способ на защищённой странице оплаты. Банковские способы и Apple Pay / Google Pay показываются в зависимости от страны, устройства и настроек кошелька.',
+        secure: 'Данные карты не вводятся на ShotMe.ee',
+        secureDetail: 'Оплату обрабатывает Stripe. При оплате через банк вы подтверждаете платёж на стороне банка.',
         featuresTitle: 'В платном пакете:',
         features: ['личная галерея восстановленных фото', 'ручные правки результата', 'голосовые правки']
     },
@@ -31,9 +34,12 @@ const TEXTS: Record<string, any> = {
         plan2: 'Pro',
         plan2Desc: '50 generations',
         plan2Price: '10 €',
-        btn: 'Buy Now',
+        btn: 'Choose payment method',
         best: 'Best Value',
-        secure: 'Secure payment via Stripe',
+        paymentTitle: 'Pay the familiar way',
+        paymentDescription: 'Choose an available method on the secure payment page. Bank payments and Apple Pay / Google Pay depend on your country, device and wallet setup.',
+        secure: 'No card details are entered on ShotMe.ee',
+        secureDetail: 'Stripe processes the payment. Bank payments are confirmed with your bank.',
         featuresTitle: 'Included in paid packs:',
         features: ['your private restored photo gallery', 'manual result corrections', 'voice corrections']
     },
@@ -46,9 +52,12 @@ const TEXTS: Record<string, any> = {
         plan2: 'Pro',
         plan2Desc: '50 genereerimist',
         plan2Price: '10 €',
-        btn: 'Osta kohe',
+        btn: 'Vali makseviis',
         best: 'Parim valik',
-        secure: 'Turvaline makse Stripe kaudu',
+        paymentTitle: 'Maksa harjumuspärasel viisil',
+        paymentDescription: 'Vali turvalisel makselehel saadaolev makseviis. Pangamaksed ning Apple Pay / Google Pay sõltuvad riigist, seadmest ja rahakoti seadistusest.',
+        secure: 'ShotMe.ee-s kaardiandmeid ei sisestata',
+        secureDetail: 'Makseid töötleb Stripe. Pangamakse kinnitad oma pangas.',
         featuresTitle: 'Tasulises paketis:',
         features: ['isiklik taastatud fotode galerii', 'käsitsi parandused', 'häälparandused']
     },
@@ -61,9 +70,12 @@ const TEXTS: Record<string, any> = {
         plan2: 'Pro',
         plan2Desc: '50 ģenerācijas',
         plan2Price: '10 €',
-        btn: 'Pirkt tagad',
+        btn: 'Izvēlēties maksājuma veidu',
         best: 'Labākā izvēle',
-        secure: 'Droša apmaksa ar Stripe',
+        paymentTitle: 'Maksājiet ierastajā veidā',
+        paymentDescription: 'Drošajā maksājumu lapā izvēlieties pieejamo maksājuma veidu. Bankas maksājumi un Apple Pay / Google Pay ir atkarīgi no valsts, ierīces un maka iestatījumiem.',
+        secure: 'ShotMe.ee netiek ievadīti kartes dati',
+        secureDetail: 'Maksājumu apstrādā Stripe. Bankas maksājumu apstiprināt savā bankā.',
         featuresTitle: 'Maksas paketē:',
         features: ['personīgā atjaunoto foto galerija', 'manuāli labojumi', 'balss labojumi']
     },
@@ -76,9 +88,12 @@ const TEXTS: Record<string, any> = {
         plan2: 'Pro',
         plan2Desc: '50 generacijų',
         plan2Price: '10 €',
-        btn: 'Pirkti dabar',
+        btn: 'Pasirinkti mokėjimo būdą',
         best: 'Geriausias pasirinkimas',
-        secure: 'Saugus mokėjimas per Stripe',
+        paymentTitle: 'Mokėkite įprastu būdu',
+        paymentDescription: 'Saugiame mokėjimo puslapyje pasirinkite prieinamą būdą. Banko mokėjimai ir Apple Pay / Google Pay priklauso nuo šalies, įrenginio ir piniginės nustatymų.',
+        secure: 'ShotMe.ee kortelės duomenų neįvedate',
+        secureDetail: 'Mokėjimą apdoroja Stripe. Banko mokėjimą patvirtinate savo banke.',
         featuresTitle: 'Mokamame pakete:',
         features: ['asmeninė atkurtų nuotraukų galerija', 'rankiniai pataisymai', 'balso pataisymai']
     },
@@ -91,9 +106,12 @@ const TEXTS: Record<string, any> = {
         plan2: 'Pro',
         plan2Desc: '50 generointia',
         plan2Price: '10 €',
-        btn: 'Osta nyt',
+        btn: 'Valitse maksutapa',
         best: 'Paras valinta',
-        secure: 'Turvallinen maksu Stripen kautta',
+        paymentTitle: 'Maksa tutulla tavalla',
+        paymentDescription: 'Valitse saatavilla oleva maksutapa suojatulla maksusivulla. Pankkimaksut sekä Apple Pay / Google Pay riippuvat maasta, laitteesta ja lompakon asetuksista.',
+        secure: 'Korttitietoja ei syötetä ShotMe.ee:hen',
+        secureDetail: 'Stripe käsittelee maksun. Pankkimaksun vahvistat omassa pankissasi.',
         featuresTitle: 'Maksulliseen pakettiin kuuluu:',
         features: ['oma entisöityjen kuvien galleria', 'manuaaliset korjaukset', 'äänikorjaukset']
     }
@@ -118,6 +136,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, onClose, language
                 <div className="text-center">
                     <h2 className="text-3xl font-extrabold tracking-[-0.03em] text-lab-ink sm:text-4xl">{t.title}</h2>
                     <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-lab-ink/65 sm:text-base">{t.subtitle}</p>
+                </div>
+
+                <div className="mt-5 rounded-lg border border-[#bdd8cf] bg-[#eef6f1] px-4 py-4 text-left sm:px-5">
+                    <div className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lab-teal text-sm font-black text-white" aria-hidden="true">✓</span>
+                        <div>
+                            <p className="font-extrabold text-lab-ink">{t.paymentTitle}</p>
+                            <p className="mt-1 text-sm leading-5 text-lab-ink/70">{t.paymentDescription}</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="mt-6 border-y border-lab-line py-5">
@@ -162,8 +190,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, onClose, language
                     </div>
                 </div>
 
-                <div className="mt-5 flex items-center justify-center gap-2 text-xs font-semibold text-lab-ink/55">
-                    {t.secure}
+                <div className="mt-5 text-center text-xs font-semibold leading-5 text-lab-ink/60">
+                    <p>{t.secure}</p>
+                    <p className="mt-1 font-medium text-lab-ink/50">{t.secureDetail}</p>
                 </div>
             </div>
         </div>

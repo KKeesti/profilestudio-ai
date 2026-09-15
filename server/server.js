@@ -955,6 +955,10 @@ app.post('/api/payment/create-session', requireAuth, async (req, res) => {
       client_reference_id: statsIdentity(email),
       line_items: [{ price: plan.priceId, quantity: 1 }],
       mode: 'payment',
+      // Stripe Checkout chooses from payment methods activated in the Dashboard
+      // based on the customer's country, currency, and device. This lets bank
+      // redirects and wallets appear without hard-coding country-specific banks.
+      locale: 'auto',
       success_url: `${frontendUrl}/?payment=success`,
       cancel_url: `${frontendUrl}/?payment=cancel`,
       metadata: { planId: req.body.planId, credits: String(plan.credits) },
