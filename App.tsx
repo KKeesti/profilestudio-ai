@@ -5,7 +5,6 @@ import Header from './components/Header';
 import EmailModal from './components/EmailModal';
 import PaymentModal from './components/PaymentModal';
 import LandingSections from './components/LandingSections';
-import RestorationMorph from './components/RestorationMorph';
 import { GeminiService } from './services/geminiService';
 import { ICONS } from './constants';
 import { TRANSLATIONS } from './translations';
@@ -13,6 +12,15 @@ import { LANDING_CONTENT } from './landingContent';
 import { classifyFunnelError, trackFunnel } from './services/analyticsService';
 
 const FREE_TRIAL_LIMIT = 10;
+
+const MOBILE_UPLOAD_COPY: Record<Language, { camera: string; gallery: string; privacy: string }> = {
+  [Language.EN]: { camera: 'Take a photo', gallery: 'Choose from gallery', privacy: 'Your photo stays yours' },
+  [Language.ET]: { camera: 'Pildista foto', gallery: 'Vali galeriist', privacy: 'Sinu foto jääb sulle' },
+  [Language.RU]: { camera: 'Сфотографировать фото', gallery: 'Выбрать из галереи', privacy: 'Ваше фото остаётся вашим' },
+  [Language.LV]: { camera: 'Nofotografēt attēlu', gallery: 'Izvēlēties no galerijas', privacy: 'Jūsu foto paliek jūsu' },
+  [Language.LT]: { camera: 'Nufotografuoti nuotrauką', gallery: 'Pasirinkti iš galerijos', privacy: 'Jūsų nuotrauka lieka jūsų' },
+  [Language.FI]: { camera: 'Ota kuva valokuvasta', gallery: 'Valitse galleriasta', privacy: 'Kuvasi pysyy omana' },
+};
 
 const detectBrowserLanguage = (): Language => {
   if (typeof navigator === 'undefined') return Language.EN;
@@ -77,6 +85,7 @@ const App: React.FC = () => {
   const recordingStreamRef = useRef<MediaStream | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadCtaRef = useRef<HTMLButtonElement>(null);
   const ctaImpressionTrackedRef = useRef(false);
   const scrollDepthsTrackedRef = useRef<Set<number>>(new Set());
@@ -462,38 +471,57 @@ const App: React.FC = () => {
   const renderContent = () => {
     const t = TRANSLATIONS[language];
     const landing = LANDING_CONTENT[language];
+    const mobileCopy = MOBILE_UPLOAD_COPY[language];
     const openUpload = () => {
       trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD, style: PhotoStyle.RESTORE_OLD_PHOTO });
       fileInputRef.current?.click();
+    };
+    const openCamera = () => {
+      trackFunnel('upload_cta_clicked', { language, screen: AppStep.UPLOAD, style: PhotoStyle.RESTORE_OLD_PHOTO });
+      cameraInputRef.current?.click();
     };
 
     switch (step) {
       case AppStep.UPLOAD:
         return (
-          <div className="w-full animate-in fade-in duration-500">
-            <section className="bg-lab-ink text-white">
-              <div className="mx-auto grid max-w-[1200px] lg:min-h-[640px] lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="order-2 flex flex-col justify-center px-4 py-5 min-[360px]:px-6 min-[360px]:py-9 sm:px-10 lg:order-none lg:px-14 lg:py-16">
-                  <h1 className="max-w-[16ch] text-balance text-[28px] font-extrabold leading-[1.05] tracking-[-0.03em] min-[360px]:text-4xl sm:max-w-[15ch] sm:text-5xl lg:text-[56px]">
+          <div className="w-full overflow-hidden bg-[#faf7f0] animate-in fade-in duration-500">
+            <section className="px-4 pb-8 pt-6 sm:px-6 sm:pb-14 sm:pt-12">
+              <div className="mx-auto grid max-w-[1100px] items-center gap-8 lg:grid-cols-[0.94fr_1.06fr] lg:gap-16">
+                <div className="mx-auto w-full max-w-xl text-center lg:mx-0 lg:text-left">
+                  <p className="inline-flex items-center gap-2 rounded-full bg-[#e4efe9] px-3 py-2 text-xs font-bold text-lab-teal sm:text-sm">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+                    {mobileCopy.privacy}
+                  </p>
+                  <h1 className="mt-5 text-balance text-[34px] font-extrabold leading-[1.02] tracking-[-0.035em] text-lab-ink min-[390px]:text-[42px] sm:mt-6 sm:text-6xl lg:text-[64px]">
                     {t.restoreLandingTitle}
                   </h1>
-                  <p className="mt-3 max-w-[58ch] text-[15px] leading-6 text-[#d8ece6] max-[359px]:hidden min-[360px]:mt-5 min-[360px]:text-base min-[360px]:leading-7 sm:text-lg">
+                  <p className="mx-auto mt-5 max-w-[35rem] text-[16px] leading-7 text-lab-ink/70 sm:text-lg lg:mx-0">
                     {t.restoreLandingDesc}
                   </p>
 
-                  <button
-                    ref={uploadCtaRef}
-                    type="button"
-                    onClick={openUpload}
-                    onDragEnter={(event) => { event.preventDefault(); setIsUploadDragging(true); }}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDragLeave={() => setIsUploadDragging(false)}
-                    onDrop={handleImageDrop}
-                    className={`mt-4 flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md px-4 py-3 text-base font-extrabold text-lab-ink shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-colors active:translate-y-px min-[360px]:mt-7 min-[360px]:min-h-16 min-[360px]:px-5 min-[360px]:py-4 sm:text-lg ${isUploadDragging ? 'bg-white' : 'bg-lab-coral hover:bg-white'}`}
-                  >
-                    <ICONS.Camera /> {t.restoreLandingCta}
-                  </button>
-                  <p className="mt-2 text-xs font-semibold leading-5 text-[#d8ece6] min-[360px]:mt-3 min-[360px]:text-sm">
+                  <div className="mx-auto mt-7 grid max-w-md gap-3 lg:mx-0">
+                    <button
+                      ref={uploadCtaRef}
+                      type="button"
+                      onClick={openCamera}
+                      className="flex min-h-16 w-full items-center justify-center gap-3 rounded-xl bg-lab-coral px-5 py-4 text-base font-extrabold text-lab-ink shadow-[0_14px_30px_rgba(241,105,79,0.22)] transition-colors hover:bg-[#f47e65] active:translate-y-px sm:text-lg"
+                    >
+                      <ICONS.Camera /> {mobileCopy.camera}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openUpload}
+                      onDragEnter={(event) => { event.preventDefault(); setIsUploadDragging(true); }}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDragLeave={() => setIsUploadDragging(false)}
+                      onDrop={handleImageDrop}
+                      className={`flex min-h-14 w-full items-center justify-center gap-3 rounded-xl border-2 px-5 py-3 text-base font-extrabold transition-colors active:translate-y-px ${isUploadDragging ? 'border-lab-teal bg-[#e4efe9] text-lab-teal' : 'border-lab-ink bg-transparent text-lab-ink hover:bg-white'}`}
+                    >
+                      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                      {mobileCopy.gallery}
+                    </button>
+                  </div>
+                  <p className="mt-4 text-sm font-semibold text-lab-ink/65">
                     {userEmail
                       ? `${t.creditsLeft}: ${credits}`
                       : freeGenerationsUsed > 0
@@ -502,17 +530,24 @@ const App: React.FC = () => {
                   </p>
                 </div>
 
-                <RestorationMorph
-                  beforeLabel={t.demoBefore}
-                  afterLabel={t.demoAfter}
-                  ariaLabel={landing.compareLabel}
-                  className="order-1 h-40 min-[360px]:h-60 lg:order-none lg:h-full lg:min-h-[640px]"
-                />
+                <figure className="relative mx-auto w-full max-w-[540px] overflow-hidden rounded-2xl bg-lab-ink shadow-[0_22px_55px_rgba(21,48,43,0.18)]">
+                  <div className="grid aspect-[1.06] grid-cols-2">
+                    <div className="relative overflow-hidden border-r-2 border-white/85">
+                      <img src="/examples/restore-family-1940-before.png" alt={t.demoBefore} className="h-full w-full object-cover object-center grayscale" />
+                      <span className="absolute left-3 top-3 rounded-full bg-lab-ink/75 px-3 py-1.5 text-xs font-extrabold text-white">{t.demoBefore}</span>
+                    </div>
+                    <div className="relative overflow-hidden">
+                      <img src="/examples/restore-family-1940-after.png" alt={t.demoAfter} className="h-full w-full object-cover object-center" />
+                      <span className="absolute right-3 top-3 rounded-full bg-lab-teal px-3 py-1.5 text-xs font-extrabold text-white">{t.demoAfter}</span>
+                    </div>
+                  </div>
+                  <div className="pointer-events-none absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-lab-line bg-white text-xl font-bold text-lab-ink shadow-lg" aria-hidden="true">‹›</div>
+                </figure>
               </div>
             </section>
 
-            <section className="bg-white px-4 sm:px-6">
-              <div className="mx-auto grid max-w-[1200px] divide-y divide-lab-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <section className="border-y border-lab-line bg-white px-4 sm:px-6">
+              <div className="mx-auto grid max-w-[1100px] divide-y divide-lab-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                 {[t.restoreTrustFace, t.restoreTrustOriginal, t.restoreTrustPreview].map((promise) => (
                   <div key={promise} className="flex min-h-16 items-center gap-3 py-4 text-sm font-semibold leading-5 text-lab-ink sm:px-6">
                     <svg className="shrink-0 text-lab-teal" width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
@@ -774,6 +809,14 @@ const App: React.FC = () => {
         accept="image/*"
         className="hidden"
         ref={fileInputRef}
+        onChange={handleImageUpload}
+      />
+      <input
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        ref={cameraInputRef}
         onChange={handleImageUpload}
       />
       <main className={`relative z-10 w-full flex-grow ${step === AppStep.UPLOAD ? '' : 'px-4 py-4 sm:px-6 sm:py-6'}`}>
