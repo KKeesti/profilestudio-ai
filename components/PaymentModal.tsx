@@ -4,17 +4,18 @@ interface PaymentModalProps {
     onSelect: (planId: string) => void;
     onClose?: () => void;
     language: string;
+    animationAvailable?: boolean;
 }
 
 const TEXTS: Record<string, any> = {
     ru: {
         title: 'Выберите ваш пакет',
-        subtitle: 'Бесплатные попытки закончились. Выберите пакет генераций, чтобы продолжить.',
+        subtitle: 'Бесплатные восстановления закончились. Выберите пакет обработок, чтобы продолжить.',
         plan1: 'Старт',
-        plan1Desc: '20 генераций',
+        plan1Desc: '20 обработок',
         plan1Price: '5 €',
         plan2: 'Профи',
-        plan2Desc: '50 генераций',
+        plan2Desc: '50 обработок',
         plan2Price: '10 €',
         btn: 'Выбрать способ оплаты',
         best: 'Лучший выбор',
@@ -22,17 +23,17 @@ const TEXTS: Record<string, any> = {
         paymentDescription: 'Выберите доступный способ на защищённой странице оплаты. Банковские способы и Apple Pay / Google Pay показываются в зависимости от страны, устройства и настроек кошелька.',
         secure: 'Данные карты не вводятся на ShotMe.ee',
         secureDetail: 'Оплату обрабатывает Stripe. При оплате через банк вы подтверждаете платёж на стороне банка.',
-        featuresTitle: 'В платном пакете:',
-        features: ['личная галерея восстановленных фото', 'ручные правки результата', 'голосовые правки']
+        featuresTitle: 'Как расходуются обработки:',
+        features: ['восстановление или правка — 1', 'оживление фото до 5 секунд — 10', 'личная галерея восстановленных фото']
     },
     en: {
         title: 'Choose your plan',
-        subtitle: 'Free attempts are over. Choose a generation pack to continue.',
+        subtitle: 'Your free restorations are over. Choose a processing pack to continue.',
         plan1: 'Start',
-        plan1Desc: '20 generations',
+        plan1Desc: '20 processing credits',
         plan1Price: '5 €',
         plan2: 'Pro',
-        plan2Desc: '50 generations',
+        plan2Desc: '50 processing credits',
         plan2Price: '10 €',
         btn: 'Choose payment method',
         best: 'Best Value',
@@ -40,17 +41,17 @@ const TEXTS: Record<string, any> = {
         paymentDescription: 'Choose an available method on the secure payment page. Bank payments and Apple Pay / Google Pay depend on your country, device and wallet setup.',
         secure: 'No card details are entered on ShotMe.ee',
         secureDetail: 'Stripe processes the payment. Bank payments are confirmed with your bank.',
-        featuresTitle: 'Included in paid packs:',
-        features: ['your private restored photo gallery', 'manual result corrections', 'voice corrections']
+        featuresTitle: 'How credits are used:',
+        features: ['restoration or correction — 1', 'animate a photo up to 5 seconds — 10', 'your private restored photo gallery']
     },
     et: {
         title: 'Vali oma pakett',
-        subtitle: 'Tasuta katsed on läbi. Vali jätkamiseks genereerimiste pakett.',
+        subtitle: 'Tasuta taastamised on läbi. Vali jätkamiseks töötluste pakett.',
         plan1: 'Start',
-        plan1Desc: '20 genereerimist',
+        plan1Desc: '20 töötlust',
         plan1Price: '5 €',
         plan2: 'Pro',
-        plan2Desc: '50 genereerimist',
+        plan2Desc: '50 töötlust',
         plan2Price: '10 €',
         btn: 'Vali makseviis',
         best: 'Parim valik',
@@ -58,17 +59,17 @@ const TEXTS: Record<string, any> = {
         paymentDescription: 'Vali turvalisel makselehel saadaolev makseviis. Pangamaksed ning Apple Pay / Google Pay sõltuvad riigist, seadmest ja rahakoti seadistusest.',
         secure: 'ShotMe.ee-s kaardiandmeid ei sisestata',
         secureDetail: 'Makseid töötleb Stripe. Pangamakse kinnitad oma pangas.',
-        featuresTitle: 'Tasulises paketis:',
-        features: ['isiklik taastatud fotode galerii', 'käsitsi parandused', 'häälparandused']
+        featuresTitle: 'Töötluste kasutamine:',
+        features: ['taastamine või parandus — 1', 'foto elustamine kuni 5 sekundiks — 10', 'isiklik taastatud fotode galerii']
     },
     lv: {
         title: 'Izvēlieties paketi',
-        subtitle: 'Bezmaksas mēģinājumi ir beigušies. Izvēlieties ģenerāciju paketi, lai turpinātu.',
+        subtitle: 'Bezmaksas atjaunošanas ir beigušās. Izvēlieties apstrāžu paketi, lai turpinātu.',
         plan1: 'Starts',
-        plan1Desc: '20 ģenerācijas',
+        plan1Desc: '20 apstrādes',
         plan1Price: '5 €',
         plan2: 'Pro',
-        plan2Desc: '50 ģenerācijas',
+        plan2Desc: '50 apstrādes',
         plan2Price: '10 €',
         btn: 'Izvēlēties maksājuma veidu',
         best: 'Labākā izvēle',
@@ -76,17 +77,17 @@ const TEXTS: Record<string, any> = {
         paymentDescription: 'Drošajā maksājumu lapā izvēlieties pieejamo maksājuma veidu. Bankas maksājumi un Apple Pay / Google Pay ir atkarīgi no valsts, ierīces un maka iestatījumiem.',
         secure: 'ShotMe.ee netiek ievadīti kartes dati',
         secureDetail: 'Maksājumu apstrādā Stripe. Bankas maksājumu apstiprināt savā bankā.',
-        featuresTitle: 'Maksas paketē:',
-        features: ['personīgā atjaunoto foto galerija', 'manuāli labojumi', 'balss labojumi']
+        featuresTitle: 'Apstrāžu izmantošana:',
+        features: ['atjaunošana vai labojums — 1', 'foto atdzīvināšana līdz 5 sekundēm — 10', 'personīgā atjaunoto foto galerija']
     },
     lt: {
         title: 'Pasirinkite paketą',
-        subtitle: 'Nemokami bandymai baigėsi. Pasirinkite generacijų paketą, kad tęstumėte.',
+        subtitle: 'Nemokami atkūrimai baigėsi. Pasirinkite apdorojimų paketą, kad tęstumėte.',
         plan1: 'Startas',
-        plan1Desc: '20 generacijų',
+        plan1Desc: '20 apdorojimų',
         plan1Price: '5 €',
         plan2: 'Pro',
-        plan2Desc: '50 generacijų',
+        plan2Desc: '50 apdorojimų',
         plan2Price: '10 €',
         btn: 'Pasirinkti mokėjimo būdą',
         best: 'Geriausias pasirinkimas',
@@ -94,17 +95,17 @@ const TEXTS: Record<string, any> = {
         paymentDescription: 'Saugiame mokėjimo puslapyje pasirinkite prieinamą būdą. Banko mokėjimai ir Apple Pay / Google Pay priklauso nuo šalies, įrenginio ir piniginės nustatymų.',
         secure: 'ShotMe.ee kortelės duomenų neįvedate',
         secureDetail: 'Mokėjimą apdoroja Stripe. Banko mokėjimą patvirtinate savo banke.',
-        featuresTitle: 'Mokamame pakete:',
-        features: ['asmeninė atkurtų nuotraukų galerija', 'rankiniai pataisymai', 'balso pataisymai']
+        featuresTitle: 'Kaip naudojami apdorojimai:',
+        features: ['atkūrimas arba pataisymas — 1', 'nuotraukos atgaivinimas iki 5 sek. — 10', 'asmeninė atkurtų nuotraukų galerija']
     },
     fi: {
         title: 'Valitse paketti',
-        subtitle: 'Ilmaiset kokeilut ovat loppuneet. Valitse generointipaketti jatkaaksesi.',
+        subtitle: 'Ilmaiset palautukset ovat loppuneet. Valitse käsittelypaketti jatkaaksesi.',
         plan1: 'Start',
-        plan1Desc: '20 generointia',
+        plan1Desc: '20 käsittelyä',
         plan1Price: '5 €',
         plan2: 'Pro',
-        plan2Desc: '50 generointia',
+        plan2Desc: '50 käsittelyä',
         plan2Price: '10 €',
         btn: 'Valitse maksutapa',
         best: 'Paras valinta',
@@ -112,12 +113,12 @@ const TEXTS: Record<string, any> = {
         paymentDescription: 'Valitse saatavilla oleva maksutapa suojatulla maksusivulla. Pankkimaksut sekä Apple Pay / Google Pay riippuvat maasta, laitteesta ja lompakon asetuksista.',
         secure: 'Korttitietoja ei syötetä ShotMe.ee:hen',
         secureDetail: 'Stripe käsittelee maksun. Pankkimaksun vahvistat omassa pankissasi.',
-        featuresTitle: 'Maksulliseen pakettiin kuuluu:',
-        features: ['oma entisöityjen kuvien galleria', 'manuaaliset korjaukset', 'äänikorjaukset']
+        featuresTitle: 'Käsittelyjen käyttö:',
+        features: ['palautus tai korjaus — 1', 'kuvan elävöitys enintään 5 sekunniksi — 10', 'oma entisöityjen kuvien galleria']
     }
 };
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, onClose, language }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, onClose, language, animationAvailable = false }) => {
     const lang = language in TEXTS ? language : 'en';
     const t = TEXTS[lang];
 
@@ -151,7 +152,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ onSelect, onClose, language
                 <div className="mt-6 border-y border-lab-line py-5">
                     <p className="mb-3 text-sm font-extrabold text-lab-ink">{t.featuresTitle}</p>
                     <div className="grid gap-2 sm:grid-cols-3">
-                        {t.features.map((feature: string) => (
+                        {t.features.filter((feature: string) => animationAvailable || !feature.includes('— 10')).map((feature: string) => (
                             <div key={feature} className="flex items-start gap-2 rounded-md bg-white px-3 py-3 text-xs font-semibold leading-5 text-lab-ink">
                                 <span className="text-lab-teal">✓</span><span>{feature}</span>
                             </div>

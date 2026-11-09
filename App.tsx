@@ -11,7 +11,8 @@ import { TRANSLATIONS } from './translations';
 import { LANDING_CONTENT } from './landingContent';
 import { classifyFunnelError, trackFunnel } from './services/analyticsService';
 
-const FREE_TRIAL_LIMIT = 10;
+const FREE_TRIAL_LIMIT = 3;
+const ANIMATION_CREDIT_COST = 10;
 
 const MOBILE_UPLOAD_COPY: Record<Language, { camera: string; gallery: string; privacy: string }> = {
   [Language.EN]: { camera: 'Take a photo', gallery: 'Choose from gallery', privacy: 'Your photo stays yours' },
@@ -20,6 +21,15 @@ const MOBILE_UPLOAD_COPY: Record<Language, { camera: string; gallery: string; pr
   [Language.LV]: { camera: 'Nofotografēt attēlu', gallery: 'Izvēlēties no galerijas', privacy: 'Jūsu foto paliek jūsu' },
   [Language.LT]: { camera: 'Nufotografuoti nuotrauką', gallery: 'Pasirinkti iš galerijos', privacy: 'Jūsų nuotrauka lieka jūsų' },
   [Language.FI]: { camera: 'Ota kuva valokuvasta', gallery: 'Valitse galleriasta', privacy: 'Kuvasi pysyy omana' },
+};
+
+const ANIMATION_COPY: Record<Language, { cost: string; detail: string; processing: string; result: string; download: string; permission: string }> = {
+  [Language.EN]: { cost: '10 credits', detail: 'Short video up to 5 seconds', processing: 'Bringing your photo to life…', result: 'Your animated photo', download: 'Download video', permission: 'By continuing, you confirm that you have permission to animate everyone in this photo.' },
+  [Language.ET]: { cost: '10 krediiti', detail: 'Lühike video kuni 5 sekundit', processing: 'Elustame teie fotot…', result: 'Teie elustatud foto', download: 'Laadi video alla', permission: 'Jätkates kinnitate, et teil on õigus kõiki sellel fotol olevaid inimesi animeerida.' },
+  [Language.RU]: { cost: '10 обработок', detail: 'Короткий ролик до 5 секунд', processing: 'Оживляем фотографию…', result: 'Ваше оживлённое фото', download: 'Скачать видео', permission: 'Продолжая, вы подтверждаете, что имеете право оживить всех людей на этом фото.' },
+  [Language.LV]: { cost: '10 kredīti', detail: 'Īss video līdz 5 sekundēm', processing: 'Atdzīvinām jūsu foto…', result: 'Jūsu atdzīvinātais foto', download: 'Lejupielādēt video', permission: 'Turpinot, jūs apstiprināt, ka jums ir tiesības animēt visus cilvēkus šajā fotoattēlā.' },
+  [Language.LT]: { cost: '10 kreditų', detail: 'Trumpas vaizdo įrašas iki 5 sekundžių', processing: 'Atgaiviname jūsų nuotrauką…', result: 'Jūsų atgaivinta nuotrauka', download: 'Atsisiųsti vaizdo įrašą', permission: 'Tęsdami patvirtinate, kad turite teisę animuoti visus šioje nuotraukoje esančius žmones.' },
+  [Language.FI]: { cost: '10 krediittiä', detail: 'Lyhyt video, enintään 5 sekuntia', processing: 'Elävöitämme kuvaasi…', result: 'Elävöitetty kuvasi', download: 'Lataa video', permission: 'Jatkamalla vahvistat, että sinulla on oikeus animoida kaikki kuvassa olevat henkilöt.' },
 };
 
 const detectBrowserLanguage = (): Language => {
@@ -51,6 +61,7 @@ const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
+  const [animationVideo, setAnimationVideo] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
   const [selectedStyle, setSelectedStyle] = useState<PhotoStyle | null>(null);
   const [correctionRequest, setCorrectionRequest] = useState('');
@@ -75,7 +86,7 @@ const App: React.FC = () => {
     status: '',
   });
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancel' | null>(null);
-  const [showAnimatePaywall, setShowAnimatePaywall] = useState(false);
+  const [animationAvailable, setAnimationAvailable] = useState(false);
   const [generationError, setGenerationError] = useState<'restricted' | 'unavailable' | null>(null);
   const [isUploadDragging, setIsUploadDragging] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -94,6 +105,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     trackFunnel('page_view', { language, screen: AppStep.UPLOAD });
+  }, []);
+
+  useEffect(() => {
+    GeminiService.getFeatures()
+      .then(features => setAnimationAvailable(features.animationEnabled))
+      .catch(() => setAnimationAvailable(false));
   }, []);
 
   useEffect(() => {
@@ -296,6 +313,7 @@ const App: React.FC = () => {
       const imageData = event.target?.result as string;
       setOriginalImage(imageData);
       setResultImage(null);
+      setAnimationVideo(null);
       setShowOriginal(false);
 
       const probe = new Image();
@@ -337,6 +355,7 @@ const App: React.FC = () => {
     try {
       const res = await GeminiService.refinePhoto(resultImage, correctionRequest);
       setResultImage(res);
+      setAnimationVideo(null);
       setCorrectionRequest('');
       setCredits(prev => Math.max(0, prev - 1));
     } catch (error: any) {
@@ -390,13 +409,39 @@ const App: React.FC = () => {
     downloadDataUrl(resultImage, 'shotme-restored-photo.jpg');
   };
 
-  const handleAnimatePhotoClick = () => {
+  const handleAnimatePhotoClick = async () => {
     trackFunnel('animate_photo_clicked', {
       language,
       screen: AppStep.RESULT,
       style: selectedStyle || undefined,
     });
-    setShowAnimatePaywall(true);
+    if (!resultImage) return;
+    if (!userEmail) {
+      setShowEmailModalForGenerate(true);
+      return;
+    }
+    if (credits < ANIMATION_CREDIT_COST) {
+      setShowPaymentModal(true);
+      return;
+    }
+
+    const animationCopy = ANIMATION_COPY[language];
+    setProcessing({ isProcessing: true, status: animationCopy.processing });
+    try {
+      const base64Data = resultImage.split(',')[1];
+      const mimeType = resultImage.split(';')[0].split(':')[1];
+      const response = await GeminiService.animatePhoto(base64Data, mimeType, aspectRatio);
+      setAnimationVideo(response.videoUrl);
+      setCredits(response.credits);
+    } catch (error: any) {
+      if (error.message === `ANIMATION_REQUIRES_${ANIMATION_CREDIT_COST}_CREDITS`) {
+        setShowPaymentModal(true);
+      } else {
+        alert(language === Language.RU ? 'Не удалось оживить фото. Обработки не списаны.' : 'The photo could not be animated. No credits were deducted.');
+      }
+    } finally {
+      setProcessing({ isProcessing: false, status: '' });
+    }
   };
 
   const startRecording = async () => {
@@ -682,16 +727,33 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO && !premiumFeaturesEnabled && (
-                <button
-                  type="button"
-                  onClick={handleAnimatePhotoClick}
-                  className="flex min-h-14 w-full max-w-md items-center justify-center gap-3 rounded-md border border-lab-line bg-white px-6 py-4 text-base font-extrabold text-lab-teal transition-colors hover:border-lab-teal hover:bg-lab-mist"
-                >
-                  <ICONS.Play />
-                  {t.animatePhoto}
-                  <span className="rounded-md border border-current px-2 py-0.5 text-[9px] uppercase tracking-widest">PRO</span>
-                </button>
+              {selectedStyle === PhotoStyle.RESTORE_OLD_PHOTO && animationAvailable && (
+                <div className="border-y border-lab-line py-5">
+                  <button
+                    type="button"
+                    onClick={handleAnimatePhotoClick}
+                    disabled={processing.isProcessing}
+                    className="flex min-h-14 w-full items-center justify-between gap-4 rounded-md border border-lab-line bg-white px-5 py-4 text-left text-lab-teal transition-colors hover:border-lab-teal hover:bg-lab-mist disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span className="flex items-center gap-3 font-extrabold"><ICONS.Play /> {t.animatePhoto}</span>
+                    <span className="text-right text-sm font-extrabold text-lab-ink">{ANIMATION_COPY[language].cost}<small className="mt-0.5 block text-xs font-semibold text-lab-ink/55">{ANIMATION_COPY[language].detail}</small></span>
+                  </button>
+                  <p className="mt-3 text-xs leading-5 text-lab-ink/60">{ANIMATION_COPY[language].permission}</p>
+                </div>
+              )}
+
+              {animationVideo && (
+                <section className="space-y-4 rounded-lg border border-lab-line bg-white p-5 shadow-[0_12px_34px_rgba(21,48,43,0.08)] sm:p-6">
+                  <h2 className="text-xl font-extrabold text-lab-ink">{ANIMATION_COPY[language].result}</h2>
+                  <video className="w-full rounded-md bg-lab-ink" controls playsInline preload="metadata" src={animationVideo} />
+                  <button
+                    type="button"
+                    onClick={() => downloadDataUrl(animationVideo, 'shotme-animated-photo.mp4')}
+                    className="flex min-h-12 w-full items-center justify-center gap-3 rounded-md bg-lab-teal px-5 py-3 font-extrabold text-white transition-colors hover:bg-lab-ink"
+                  >
+                    <ICONS.Download /> {ANIMATION_COPY[language].download}
+                  </button>
+                </section>
               )}
             </div>
 
@@ -870,6 +932,7 @@ const App: React.FC = () => {
       {showPaymentModal && (
         <PaymentModal
           language={language}
+          animationAvailable={animationAvailable}
           onSelect={async (planId) => {
             if (!userEmail) {
               trackFunnel('email_gate_opened', { language, screen: step });
@@ -949,32 +1012,6 @@ const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setGenerationError(null)}
-              className="min-h-12 w-full rounded-md bg-lab-coral px-5 py-3 font-extrabold text-lab-ink transition-colors hover:bg-lab-ink hover:text-white"
-            >
-              {TRANSLATIONS[language].understood}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showAnimatePaywall && (
-        <div
-          className="fixed inset-0 z-[320] flex items-center justify-center bg-lab-ink/75 px-5"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="animate-paywall-title"
-          onClick={() => setShowAnimatePaywall(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-lg border border-lab-line bg-white p-7 text-center shadow-[0_24px_70px_rgba(21,48,43,0.24)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="text-5xl mb-4" aria-hidden="true">😔</div>
-            <h2 id="animate-paywall-title" className="mb-3 text-2xl font-extrabold text-lab-ink">{TRANSLATIONS[language].animatePhoto}</h2>
-            <p className="mb-6 leading-relaxed text-lab-ink/70">{TRANSLATIONS[language].animatePremiumOnly}</p>
-            <button
-              type="button"
-              onClick={() => setShowAnimatePaywall(false)}
               className="min-h-12 w-full rounded-md bg-lab-coral px-5 py-3 font-extrabold text-lab-ink transition-colors hover:bg-lab-ink hover:text-white"
             >
               {TRANSLATIONS[language].understood}

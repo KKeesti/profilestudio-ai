@@ -54,7 +54,15 @@ const allowedOrigins = new Set([
   ...(!isProduction ? ['http://localhost:3000'] : []),
 ].filter(Boolean));
 
-const FREE_TRIAL_LIMIT = 10;
+const FREE_TRIAL_LIMIT = 3;
+const ANIMATION_CREDIT_COST = 10;
+// Animation stays unavailable until the Google project explicitly exposes a
+// video model. This prevents selling a capability that the configured key
+// cannot actually fulfill.
+const VIDEO_MODEL = process.env.GEMINI_VIDEO_MODEL || '';
+const VIDEO_FEATURE_ENABLED = Boolean(VIDEO_MODEL);
+const VIDEO_DURATION_SECONDS = 5;
+const VIDEO_OPERATION_TIMEOUT_MS = 4 * 60 * 1000;
 const ANONYMOUS_DAILY_GENERATION_LIMIT = Number(process.env.ANONYMOUS_DAILY_GENERATION_LIMIT || 10);
 const MAX_ACTIVE_GENERATIONS_PER_KEY = Number(process.env.MAX_ACTIVE_GENERATIONS_PER_KEY || 1);
 const MAX_PROMPT_LENGTH = Number(process.env.MAX_PROMPT_LENGTH || 800);
@@ -558,6 +566,50 @@ async function generateImage(parts) {
   throw new HttpError(422, 'IMAGE_NOT_GENERATED');
 }
 
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function generateAnimationVideo(imagePayload, aspectRatio) {
+  let operation = await ai.models.generateVideos({
+    model: VIDEO_MODEL,
+    source: {
+      image: { imageBytes: imagePayload.base64Data, mimeType: imagePayload.mimeType },
+      prompt: 'Create a gentle, respectful five-second animation from this restored historical photograph. Preserve every person\'s identity, age, facial features, clothes, composition, and background. Use only subtle natural motion such as a blink, calm breathing, or a small head movement. No speech, no lip-sync, no dramatic camera movement, no new people or objects.',
+    },
+    config: {
+      numberOfVideos: 1,
+      durationSeconds: VIDEO_DURATION_SECONDS,
+      aspectRatio,
+      resolution: '720p',
+      generateAudio: false,
+      personGeneration: 'allow_adult',
+      negativePrompt: 'speech, singing, lip sync, face replacement, de-aging, beautification, changing clothes, changing identity, camera zoom, camera pan, extra people, extra limbs, text',
+    },
+  });
+
+  const deadline = Date.now() + VIDEO_OPERATION_TIMEOUT_MS;
+  while (!operation.done && Date.now() < deadline) {
+    await wait(5000);
+    operation = await ai.operations.getVideosOperation({ operation });
+  }
+
+  if (!operation.done) throw new HttpError(503, 'Video generation is taking too long. Please try again later.');
+  if (operation.error) throw new HttpError(422, 'Video generation was not available for this photo.');
+
+  const video = operation.response?.generatedVideos?.[0]?.video;
+  if (!video) throw new HttpError(422, 'Video generation did not return a result.');
+  if (video.videoBytes) return { base64Data: video.videoBytes, mimeType: video.mimeType || 'video/mp4' };
+
+  const temporaryPath = path.join(runtimeDirectory, `animation-${crypto.randomUUID()}.mp4`);
+  try {
+    await ai.files.download({ file: video, downloadPath: temporaryPath });
+    return { base64Data: fs.readFileSync(temporaryPath).toString('base64'), mimeType: video.mimeType || 'video/mp4' };
+  } finally {
+    fs.unlink(temporaryPath, () => {});
+  }
+}
+
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
@@ -577,6 +629,7 @@ app.use((req, res, next) => {
     "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob:",
+    "media-src 'self' data: blob:",
     "connect-src 'self'",
     "frame-src https://checkout.stripe.com",
     "object-src 'none'",
@@ -740,6 +793,8 @@ app.post('/api/auth/session', authRateLimit, async (req, res) => {
 });
 
 app.get('/api/auth/me', optionalAuth, (req, res) => res.json({ email: req.authEmail || null }));
+
+app.get('/api/features', (_req, res) => res.json({ animationEnabled: VIDEO_FEATURE_ENABLED }));
 
 app.post('/api/auth/logout', optionalAuth, (req, res) => {
   const token = getSessionToken(req);
@@ -906,6 +961,53 @@ app.post('/api/refine', requireAuth, async (req, res) => {
     res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {
     sendRouteError(res, 'Refine', err);
+  } finally {
+    if (generationSlotTaken) releaseGenerationSlot(generationKey);
+  }
+});
+
+app.post('/api/animate', requireAuth, async (req, res) => {
+  const email = req.authEmail;
+  const generationKey = `email:${email}`;
+  let generationSlotTaken = false;
+  try {
+    if (!VIDEO_FEATURE_ENABLED) throw new HttpError(503, 'Photo animation is not configured yet.');
+    if (req.body?.consent !== true) throw new HttpError(400, 'Please confirm that you have permission to animate this photo.');
+    if (!ALLOWED_ASPECT_RATIOS.has(req.body?.aspectRatio)) throw new HttpError(400, 'Unsupported aspect ratio');
+    const imagePayload = parseImagePayload(req.body?.image, req.body?.mimeType);
+    if (!takeGenerationSlot(generationKey)) throw new HttpError(429, 'Another photo is already being processed.');
+    generationSlotTaken = true;
+
+    const { data: user, error: userError } = await supabase
+      .from('users').select('paid_credits').eq('email', email).maybeSingle();
+    if (userError) throw new Error('Database error loading account');
+    const paidCredits = Number(user?.paid_credits || 0);
+    if (paidCredits < ANIMATION_CREDIT_COST) {
+      throw new HttpError(403, `ANIMATION_REQUIRES_${ANIMATION_CREDIT_COST}_CREDITS`);
+    }
+
+    const video = await generateAnimationVideo(imagePayload, req.body.aspectRatio);
+    const { data: updated, error: updateError } = await supabase
+      .from('users')
+      .update({ paid_credits: paidCredits - ANIMATION_CREDIT_COST })
+      .eq('email', email)
+      .eq('paid_credits', paidCredits)
+      .select('paid_credits')
+      .maybeSingle();
+    if (updateError || !updated) throw new HttpError(409, 'Your balance changed. The video was not charged.');
+
+    appendStatsEvent('animation_success', {
+      emailHash: statsIdentity(email),
+      maskedEmail: maskEmail(email),
+      creditsUsed: ANIMATION_CREDIT_COST,
+      durationSeconds: VIDEO_DURATION_SECONDS,
+    });
+    res.json({
+      videoUrl: `data:${video.mimeType};base64,${video.base64Data}`,
+      credits: Math.max(0, Number(updated.paid_credits || 0)),
+    });
+  } catch (err) {
+    sendRouteError(res, 'Animate', err);
   } finally {
     if (generationSlotTaken) releaseGenerationSlot(generationKey);
   }

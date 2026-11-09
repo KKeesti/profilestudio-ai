@@ -59,6 +59,10 @@ export class GeminiService {
     return data.email ? { email: data.email } : null;
   }
 
+  static async getFeatures(): Promise<{ animationEnabled: boolean }> {
+    return this.request('/features');
+  }
+
   static async logout(): Promise<void> {
     await this.request('/auth/logout', { method: 'POST', body: '{}' });
   }
@@ -83,6 +87,17 @@ export class GeminiService {
       body: JSON.stringify({ image, prompt }),
     });
     return data.imageUrl;
+  }
+
+  static async animatePhoto(
+    image: string,
+    mimeType: string,
+    aspectRatio: string,
+  ): Promise<{ videoUrl: string; credits: number }> {
+    return this.request('/animate', {
+      method: 'POST',
+      body: JSON.stringify({ image, mimeType, aspectRatio, consent: true }),
+    });
   }
 
   static async checkUser(freeTrialUsed: number = 0): Promise<UserSummary> {
