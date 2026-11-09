@@ -24,12 +24,12 @@ const MOBILE_UPLOAD_COPY: Record<Language, { camera: string; gallery: string; pr
 };
 
 const ANIMATION_COPY: Record<Language, { cost: string; detail: string; processing: string; result: string; download: string; permission: string }> = {
-  [Language.EN]: { cost: '10 credits', detail: 'Short video up to 5 seconds', processing: 'Bringing your photo to life…', result: 'Your animated photo', download: 'Download video', permission: 'By continuing, you confirm that you have permission to animate everyone in this photo.' },
-  [Language.ET]: { cost: '10 krediiti', detail: 'Lühike video kuni 5 sekundit', processing: 'Elustame teie fotot…', result: 'Teie elustatud foto', download: 'Laadi video alla', permission: 'Jätkates kinnitate, et teil on õigus kõiki sellel fotol olevaid inimesi animeerida.' },
-  [Language.RU]: { cost: '10 обработок', detail: 'Короткий ролик до 5 секунд', processing: 'Оживляем фотографию…', result: 'Ваше оживлённое фото', download: 'Скачать видео', permission: 'Продолжая, вы подтверждаете, что имеете право оживить всех людей на этом фото.' },
-  [Language.LV]: { cost: '10 kredīti', detail: 'Īss video līdz 5 sekundēm', processing: 'Atdzīvinām jūsu foto…', result: 'Jūsu atdzīvinātais foto', download: 'Lejupielādēt video', permission: 'Turpinot, jūs apstiprināt, ka jums ir tiesības animēt visus cilvēkus šajā fotoattēlā.' },
-  [Language.LT]: { cost: '10 kreditų', detail: 'Trumpas vaizdo įrašas iki 5 sekundžių', processing: 'Atgaiviname jūsų nuotrauką…', result: 'Jūsų atgaivinta nuotrauka', download: 'Atsisiųsti vaizdo įrašą', permission: 'Tęsdami patvirtinate, kad turite teisę animuoti visus šioje nuotraukoje esančius žmones.' },
-  [Language.FI]: { cost: '10 krediittiä', detail: 'Lyhyt video, enintään 5 sekuntia', processing: 'Elävöitämme kuvaasi…', result: 'Elävöitetty kuvasi', download: 'Lataa video', permission: 'Jatkamalla vahvistat, että sinulla on oikeus animoida kaikki kuvassa olevat henkilöt.' },
+  [Language.EN]: { cost: '10 credits', detail: 'Short animated video', processing: 'Bringing your photo to life…', result: 'Your animated photo', download: 'Download video', permission: 'By continuing, you confirm that you have permission to animate everyone in this photo.' },
+  [Language.ET]: { cost: '10 krediiti', detail: 'Lühike animeeritud video', processing: 'Elustame teie fotot…', result: 'Teie elustatud foto', download: 'Laadi video alla', permission: 'Jätkates kinnitate, et teil on õigus kõiki sellel fotol olevaid inimesi animeerida.' },
+  [Language.RU]: { cost: '10 обработок', detail: 'Короткий оживлённый ролик', processing: 'Оживляем фотографию…', result: 'Ваше оживлённое фото', download: 'Скачать видео', permission: 'Продолжая, вы подтверждаете, что имеете право оживить всех людей на этом фото.' },
+  [Language.LV]: { cost: '10 kredīti', detail: 'Īss animēts video', processing: 'Atdzīvinām jūsu foto…', result: 'Jūsu atdzīvinātais foto', download: 'Lejupielādēt video', permission: 'Turpinot, jūs apstiprināt, ka jums ir tiesības animēt visus cilvēkus šajā fotoattēlā.' },
+  [Language.LT]: { cost: '10 kreditų', detail: 'Trumpas animuotas vaizdo įrašas', processing: 'Atgaiviname jūsų nuotrauką…', result: 'Jūsų atgaivinta nuotrauka', download: 'Atsisiųsti vaizdo įrašą', permission: 'Tęsdami patvirtinate, kad turite teisę animuoti visus šioje nuotraukoje esančius žmones.' },
+  [Language.FI]: { cost: '10 krediittiä', detail: 'Lyhyt animoitu video', processing: 'Elävöitämme kuvaasi…', result: 'Elävöitetty kuvasi', download: 'Lataa video', permission: 'Jatkamalla vahvistat, että sinulla on oikeus animoida kaikki kuvassa olevat henkilöt.' },
 };
 
 const detectBrowserLanguage = (): Language => {

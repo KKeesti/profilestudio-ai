@@ -16,6 +16,6 @@ View your app in AI Studio: https://ai.studio/apps/cc0e9c24-ae46-4308-b205-a65e3
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. To enable paid photo animation, add `GEMINI_VIDEO_MODEL=veo-3.1-lite-generate-preview` after confirming that the Google project has paid Veo access. The interface stays hidden until this variable is present.
+3. To enable paid photo animation, add `GEMINI_VIDEO_MODEL=gemini-omni-1.1-flash` after confirming that the Google project has Paid Tier access. The interface stays hidden until this variable is present.
 4. Run the app:
    `npm run dev`

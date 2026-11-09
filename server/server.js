@@ -61,8 +61,6 @@ const ANIMATION_CREDIT_COST = 10;
 // cannot actually fulfill.
 const VIDEO_MODEL = process.env.GEMINI_VIDEO_MODEL || '';
 const VIDEO_FEATURE_ENABLED = Boolean(VIDEO_MODEL);
-const VIDEO_DURATION_SECONDS = 5;
-const VIDEO_OPERATION_TIMEOUT_MS = 4 * 60 * 1000;
 const ANONYMOUS_DAILY_GENERATION_LIMIT = Number(process.env.ANONYMOUS_DAILY_GENERATION_LIMIT || 10);
 const MAX_ACTIVE_GENERATIONS_PER_KEY = Number(process.env.MAX_ACTIVE_GENERATIONS_PER_KEY || 1);
 const MAX_PROMPT_LENGTH = Number(process.env.MAX_PROMPT_LENGTH || 800);
@@ -566,48 +564,33 @@ async function generateImage(parts) {
   throw new HttpError(422, 'IMAGE_NOT_GENERATED');
 }
 
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 async function generateAnimationVideo(imagePayload, aspectRatio) {
-  let operation = await ai.models.generateVideos({
-    model: VIDEO_MODEL,
-    source: {
-      image: { imageBytes: imagePayload.base64Data, mimeType: imagePayload.mimeType },
-      prompt: 'Create a gentle, respectful five-second animation from this restored historical photograph. Preserve every person\'s identity, age, facial features, clothes, composition, and background. Use only subtle natural motion such as a blink, calm breathing, or a small head movement. No speech, no lip-sync, no dramatic camera movement, no new people or objects.',
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': process.env.GEMINI_API_KEY,
     },
-    config: {
-      numberOfVideos: 1,
-      durationSeconds: VIDEO_DURATION_SECONDS,
-      aspectRatio,
-      resolution: '720p',
-      generateAudio: false,
-      personGeneration: 'allow_adult',
-      negativePrompt: 'speech, singing, lip sync, face replacement, de-aging, beautification, changing clothes, changing identity, camera zoom, camera pan, extra people, extra limbs, text',
-    },
+    body: JSON.stringify({
+      model: VIDEO_MODEL,
+      input: [
+        { type: 'image', data: imagePayload.base64Data, mime_type: imagePayload.mimeType },
+        { type: 'text', text: 'Create a short, gentle, respectful animation from this restored historical photograph. Preserve every person\'s identity, age, facial features, clothes, composition, and background. Use only subtle natural motion such as a blink, calm breathing, or a small head movement. No speech, no lip-sync, no dramatic camera movement, no new people or objects.' },
+      ],
+      response_format: { type: 'video', aspect_ratio: aspectRatio, resolution: '720p' },
+      generation_config: { video_config: { task: 'image_to_video' } },
+    }),
   });
-
-  const deadline = Date.now() + VIDEO_OPERATION_TIMEOUT_MS;
-  while (!operation.done && Date.now() < deadline) {
-    await wait(5000);
-    operation = await ai.operations.getVideosOperation({ operation });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload?.error?.message || 'Video generation was not available for this photo.';
+    throw new HttpError(response.status >= 500 ? 503 : 422, message);
   }
-
-  if (!operation.done) throw new HttpError(503, 'Video generation is taking too long. Please try again later.');
-  if (operation.error) throw new HttpError(422, 'Video generation was not available for this photo.');
-
-  const video = operation.response?.generatedVideos?.[0]?.video;
-  if (!video) throw new HttpError(422, 'Video generation did not return a result.');
-  if (video.videoBytes) return { base64Data: video.videoBytes, mimeType: video.mimeType || 'video/mp4' };
-
-  const temporaryPath = path.join(runtimeDirectory, `animation-${crypto.randomUUID()}.mp4`);
-  try {
-    await ai.files.download({ file: video, downloadPath: temporaryPath });
-    return { base64Data: fs.readFileSync(temporaryPath).toString('base64'), mimeType: video.mimeType || 'video/mp4' };
-  } finally {
-    fs.unlink(temporaryPath, () => {});
-  }
+  const video = (payload.steps || [])
+    .flatMap(step => step.content || [])
+    .find(content => content.type === 'video' && content.data);
+  if (!video?.data) throw new HttpError(422, 'Video generation did not return a result.');
+  return { base64Data: video.data, mimeType: video.mime_type || 'video/mp4' };
 }
 
 app.disable('x-powered-by');
@@ -1000,7 +983,7 @@ app.post('/api/animate', requireAuth, async (req, res) => {
       emailHash: statsIdentity(email),
       maskedEmail: maskEmail(email),
       creditsUsed: ANIMATION_CREDIT_COST,
-      durationSeconds: VIDEO_DURATION_SECONDS,
+      output: 'short_video',
     });
     res.json({
       videoUrl: `data:${video.mimeType};base64,${video.base64Data}`,

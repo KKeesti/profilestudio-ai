@@ -24,7 +24,7 @@ const TEXTS: Record<string, any> = {
         secure: 'Данные карты не вводятся на ShotMe.ee',
         secureDetail: 'Оплату обрабатывает Stripe. При оплате через банк вы подтверждаете платёж на стороне банка.',
         featuresTitle: 'Как расходуются обработки:',
-        features: ['восстановление или правка — 1', 'оживление фото до 5 секунд — 10', 'личная галерея восстановленных фото']
+        features: ['восстановление или правка — 1', 'оживление фото — 10', 'личная галерея восстановленных фото']
     },
     en: {
         title: 'Choose your plan',
@@ -42,7 +42,7 @@ const TEXTS: Record<string, any> = {
         secure: 'No card details are entered on ShotMe.ee',
         secureDetail: 'Stripe processes the payment. Bank payments are confirmed with your bank.',
         featuresTitle: 'How credits are used:',
-        features: ['restoration or correction — 1', 'animate a photo up to 5 seconds — 10', 'your private restored photo gallery']
+        features: ['restoration or correction — 1', 'animate a photo — 10', 'your private restored photo gallery']
     },
     et: {
         title: 'Vali oma pakett',
@@ -60,7 +60,7 @@ const TEXTS: Record<string, any> = {
         secure: 'ShotMe.ee-s kaardiandmeid ei sisestata',
         secureDetail: 'Makseid töötleb Stripe. Pangamakse kinnitad oma pangas.',
         featuresTitle: 'Töötluste kasutamine:',
-        features: ['taastamine või parandus — 1', 'foto elustamine kuni 5 sekundiks — 10', 'isiklik taastatud fotode galerii']
+        features: ['taastamine või parandus — 1', 'foto elustamine — 10', 'isiklik taastatud fotode galerii']
     },
     lv: {
         title: 'Izvēlieties paketi',
@@ -78,7 +78,7 @@ const TEXTS: Record<string, any> = {
         secure: 'ShotMe.ee netiek ievadīti kartes dati',
         secureDetail: 'Maksājumu apstrādā Stripe. Bankas maksājumu apstiprināt savā bankā.',
         featuresTitle: 'Apstrāžu izmantošana:',
-        features: ['atjaunošana vai labojums — 1', 'foto atdzīvināšana līdz 5 sekundēm — 10', 'personīgā atjaunoto foto galerija']
+        features: ['atjaunošana vai labojums — 1', 'foto atdzīvināšana — 10', 'personīgā atjaunoto foto galerija']
     },
     lt: {
         title: 'Pasirinkite paketą',
@@ -96,7 +96,7 @@ const TEXTS: Record<string, any> = {
         secure: 'ShotMe.ee kortelės duomenų neįvedate',
         secureDetail: 'Mokėjimą apdoroja Stripe. Banko mokėjimą patvirtinate savo banke.',
         featuresTitle: 'Kaip naudojami apdorojimai:',
-        features: ['atkūrimas arba pataisymas — 1', 'nuotraukos atgaivinimas iki 5 sek. — 10', 'asmeninė atkurtų nuotraukų galerija']
+        features: ['atkūrimas arba pataisymas — 1', 'nuotraukos atgaivinimas — 10', 'asmeninė atkurtų nuotraukų galerija']
     },
     fi: {
         title: 'Valitse paketti',
@@ -114,7 +114,7 @@ const TEXTS: Record<string, any> = {
         secure: 'Korttitietoja ei syötetä ShotMe.ee:hen',
         secureDetail: 'Stripe käsittelee maksun. Pankkimaksun vahvistat omassa pankissasi.',
         featuresTitle: 'Käsittelyjen käyttö:',
-        features: ['palautus tai korjaus — 1', 'kuvan elävöitys enintään 5 sekunniksi — 10', 'oma entisöityjen kuvien galleria']
+        features: ['palautus tai korjaus — 1', 'kuvan elävöitys — 10', 'oma entisöityjen kuvien galleria']
     }
 };
 
