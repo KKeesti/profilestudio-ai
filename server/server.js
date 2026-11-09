@@ -722,6 +722,12 @@ app.post('/api/analytics/event', optionalAuth, (req, res) => {
 app.post('/api/auth/device-session', authRateLimit, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: 'Valid email required' });
+  const currentEmail = getSessionEmail(req);
+  // Owner status is a privileged server-side capability. Require proof of
+  // mailbox ownership before touching or creating the account record.
+  if (isOwnerEmail(email) && currentEmail !== email) {
+    return res.status(401).json({ error: 'EMAIL_VERIFICATION_REQUIRED' });
+  }
   const declaredFreeUsed = Math.min(
     FREE_TRIAL_LIMIT,
     Math.max(0, Number.isFinite(Number(req.body?.freeTrialUsed)) ? Math.floor(Number(req.body.freeTrialUsed)) : 0),
@@ -734,7 +740,6 @@ app.post('/api/auth/device-session', authRateLimit, async (req, res) => {
       .from('generations').select('*', { count: 'exact', head: true }).eq('user_email', email);
     if (countError) throw new Error('Database error loading account');
 
-    const currentEmail = getSessionEmail(req);
     const protectedAccount = isOwnerEmail(email) || (existingUser?.paid_credits || 0) > 0 || (count || 0) > 0;
     if (protectedAccount && currentEmail !== email) {
       return res.status(401).json({ error: 'EMAIL_VERIFICATION_REQUIRED' });
