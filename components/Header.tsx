@@ -8,6 +8,7 @@ interface HeaderProps {
   credits?: number;
   showCredits?: boolean;
   hasGallery?: boolean;
+  isOwner?: boolean;
   onBuyCredits?: () => void;
   onViewHistory?: () => void;
   onLogout?: () => void;
@@ -23,12 +24,22 @@ const SIGN_OUT: Record<Language, string> = {
   [Language.FI]: 'Kirjaudu ulos',
 };
 
+const OWNER_ACCESS: Record<Language, string> = {
+  [Language.EN]: 'Owner access',
+  [Language.RU]: 'Доступ владельца',
+  [Language.ET]: 'Omaniku ligipääs',
+  [Language.LV]: 'Īpašnieka piekļuve',
+  [Language.LT]: 'Savininko prieiga',
+  [Language.FI]: 'Omistajan käyttöoikeus',
+};
+
 const Header: React.FC<HeaderProps> = ({
   language,
   onLanguageChange,
   credits = 0,
   showCredits = false,
   hasGallery = false,
+  isOwner = false,
   onBuyCredits,
   onViewHistory,
   onLogout,
@@ -64,11 +75,11 @@ const Header: React.FC<HeaderProps> = ({
 
           {showCredits && (
             <span className="whitespace-nowrap rounded-full bg-lab-mist px-3 py-2 text-xs font-bold tabular-nums text-lab-ink">
-              <span className="hidden sm:inline">{userEmail ? t.creditsLeft : (t.freeCredits || t.creditsLeft)}: </span>{credits}
+              {isOwner ? OWNER_ACCESS[language] : <><span className="hidden sm:inline">{userEmail ? t.creditsLeft : (t.freeCredits || t.creditsLeft)}: </span>{credits}</>}
             </span>
           )}
 
-          {userEmail && onBuyCredits && (
+          {userEmail && !isOwner && onBuyCredits && (
             <button
               type="button"
               onClick={onBuyCredits}

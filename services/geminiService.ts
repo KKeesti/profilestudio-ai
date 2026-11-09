@@ -3,6 +3,7 @@ import { PhotoStyle } from '../types';
 type UserSummary = {
   credits: number;
   hasPaid?: boolean;
+  isOwner?: boolean;
   email: string;
 };
 

@@ -13,6 +13,14 @@ import { classifyFunnelError, trackFunnel } from './services/analyticsService';
 
 const FREE_TRIAL_LIMIT = 3;
 const ANIMATION_CREDIT_COST = 10;
+const OWNER_ACCESS_LABEL: Record<Language, string> = {
+  [Language.EN]: 'Owner access',
+  [Language.ET]: 'Omaniku ligipääs',
+  [Language.RU]: 'Доступ владельца',
+  [Language.LV]: 'Īpašnieka piekļuve',
+  [Language.LT]: 'Savininko prieiga',
+  [Language.FI]: 'Omistajan käyttöoikeus',
+};
 
 const MOBILE_UPLOAD_COPY: Record<Language, { camera: string; gallery: string; privacy: string }> = {
   [Language.EN]: { camera: 'Take a photo', gallery: 'Choose from gallery', privacy: 'Your photo stays yours' },
@@ -71,6 +79,7 @@ const App: React.FC = () => {
   const [freeGenerationsUsed, setFreeGenerationsUsed] = useState(getStoredFreeGenerationsUsed);
 
   const [credits, setCredits] = useState<number>(0);
+  const [isOwner, setIsOwner] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [historyItems, setHistoryItems] = useState<Array<{
@@ -183,6 +192,7 @@ const App: React.FC = () => {
         if (!currentUser) {
           localStorage.removeItem('ps_email');
           localStorage.removeItem('ps_credits');
+          setIsOwner(false);
           if (params.get('payment') === 'cancel') setPaymentStatus('cancel');
           if (params.has('payment')) window.history.replaceState({}, '', window.location.pathname);
           return;
@@ -194,6 +204,7 @@ const App: React.FC = () => {
         localStorage.setItem('ps_email', currentUser.email);
         setCredits(userData.credits);
         setHasGallery(userData.hasPaid || false);
+        setIsOwner(Boolean(userData.isOwner));
 
         if (params.get('payment') === 'success') {
           setPaymentStatus('success');
@@ -204,6 +215,7 @@ const App: React.FC = () => {
               if (!cancelled) {
                 setCredits(refreshed.credits);
                 setHasGallery(refreshed.hasPaid || false);
+                setIsOwner(Boolean(refreshed.isOwner));
               }
             } catch (error) {
               console.error('Failed to refresh paid credits', error);
@@ -251,6 +263,7 @@ const App: React.FC = () => {
     const activeEmail = userEmail;
     const isAnonymousFreeGeneration = !activeEmail;
     let currentCredits = Number(credits);
+    let accountIsOwner = isOwner;
 
     if (isAnonymousFreeGeneration) {
       if (freeCreditsLeft <= 0) {
@@ -264,12 +277,14 @@ const App: React.FC = () => {
         currentCredits = userData.credits;
         setCredits(userData.credits);
         setHasGallery(userData.hasPaid || false);
+        accountIsOwner = Boolean(userData.isOwner);
+        setIsOwner(accountIsOwner);
       } catch (e: any) {
         alert('Network error syncing user: ' + e.message);
         return;
       }
 
-      if (currentCredits <= 0) {
+      if (currentCredits <= 0 && !accountIsOwner) {
         trackFunnel('payment_opened', { language, screen: generationEntryScreen });
         setShowPaymentModal(true);
         return;
@@ -288,7 +303,7 @@ const App: React.FC = () => {
       trackFunnel('generation_succeeded', { language, screen: AppStep.RESULT, style });
       setStep(AppStep.RESULT);
 
-      if (activeEmail) {
+      if (activeEmail && !accountIsOwner) {
         setCredits(prev => Math.max(0, prev - 1));
       } else {
         setFreeGenerationsUsed(prev => Math.min(FREE_TRIAL_LIMIT, prev + 1));
@@ -357,7 +372,7 @@ const App: React.FC = () => {
       setResultImage(res);
       setAnimationVideo(null);
       setCorrectionRequest('');
-      setCredits(prev => Math.max(0, prev - 1));
+      if (!isOwner) setCredits(prev => Math.max(0, prev - 1));
     } catch (error: any) {
       if (error.message === 'OUT_OF_CREDITS') {
         setShowPaymentModal(true);
@@ -420,7 +435,7 @@ const App: React.FC = () => {
       setShowEmailModalForGenerate(true);
       return;
     }
-    if (credits < ANIMATION_CREDIT_COST) {
+    if (credits < ANIMATION_CREDIT_COST && !isOwner) {
       setShowPaymentModal(true);
       return;
     }
@@ -568,7 +583,7 @@ const App: React.FC = () => {
                   </div>
                   <p className="mt-4 text-sm font-semibold text-lab-ink/65">
                     {userEmail
-                      ? `${t.creditsLeft}: ${credits}`
+                      ? (isOwner ? OWNER_ACCESS_LABEL[language] : `${t.creditsLeft}: ${credits}`)
                       : freeGenerationsUsed > 0
                         ? `${t.freeCredits}: ${freeCreditsLeft}`
                         : t.restoreLandingFree}
@@ -736,7 +751,7 @@ const App: React.FC = () => {
                     className="flex min-h-14 w-full items-center justify-between gap-4 rounded-md border border-lab-line bg-white px-5 py-4 text-left text-lab-teal transition-colors hover:border-lab-teal hover:bg-lab-mist disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <span className="flex items-center gap-3 font-extrabold"><ICONS.Play /> {t.animatePhoto}</span>
-                    <span className="text-right text-sm font-extrabold text-lab-ink">{ANIMATION_COPY[language].cost}<small className="mt-0.5 block text-xs font-semibold text-lab-ink/55">{ANIMATION_COPY[language].detail}</small></span>
+                    <span className="text-right text-sm font-extrabold text-lab-ink">{isOwner ? OWNER_ACCESS_LABEL[language] : ANIMATION_COPY[language].cost}<small className="mt-0.5 block text-xs font-semibold text-lab-ink/55">{ANIMATION_COPY[language].detail}</small></span>
                   </button>
                   <p className="mt-3 text-xs leading-5 text-lab-ink/60">{ANIMATION_COPY[language].permission}</p>
                 </div>
@@ -843,6 +858,7 @@ const App: React.FC = () => {
         language={language}
         onLanguageChange={setLanguage}
         credits={userEmail ? credits : freeCreditsLeft}
+        isOwner={isOwner}
         showCredits={Boolean(userEmail || freeGenerationsUsed > 0)}
         userEmail={userEmail}
         hasGallery={hasGallery}
@@ -858,6 +874,7 @@ const App: React.FC = () => {
             setUserEmail(null);
             setCredits(0);
             setHasGallery(false);
+            setIsOwner(false);
             setHistoryItems([]);
             setResultImage(null);
             setStep(AppStep.UPLOAD);
@@ -966,8 +983,9 @@ const App: React.FC = () => {
               localStorage.setItem('ps_email', userData.email);
               setCredits(userData.credits);
               setHasGallery(userData.hasPaid || false);
+              setIsOwner(Boolean(userData.isOwner));
               setShowEmailModalForGenerate(false);
-              if (userData.credits <= 0) setShowPaymentModal(true);
+              if (userData.credits <= 0 && !userData.isOwner) setShowPaymentModal(true);
             } catch (error) {
               if (error instanceof Error && error.message === 'EMAIL_VERIFICATION_REQUIRED') {
                 await GeminiService.requestLoginLink(email);

@@ -61,6 +61,14 @@ const ANIMATION_CREDIT_COST = 10;
 // cannot actually fulfill.
 const VIDEO_MODEL = process.env.GEMINI_VIDEO_MODEL || '';
 const VIDEO_FEATURE_ENABLED = Boolean(VIDEO_MODEL);
+// A comma-separated allowlist kept only in the server environment. Never expose
+// these addresses to the browser or use a client-provided "owner" flag.
+const OWNER_EMAILS = new Set(
+  (process.env.OWNER_EMAILS || '')
+    .split(',')
+    .map(normalizeEmail)
+    .filter(isValidEmail),
+);
 const ANONYMOUS_DAILY_GENERATION_LIMIT = Number(process.env.ANONYMOUS_DAILY_GENERATION_LIMIT || 10);
 const MAX_ACTIVE_GENERATIONS_PER_KEY = Number(process.env.MAX_ACTIVE_GENERATIONS_PER_KEY || 1);
 const MAX_PROMPT_LENGTH = Number(process.env.MAX_PROMPT_LENGTH || 800);
@@ -131,6 +139,10 @@ function normalizeEmail(email) {
 
 function isValidEmail(email) {
   return typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isOwnerEmail(email) {
+  return OWNER_EMAILS.has(normalizeEmail(email));
 }
 
 function maskEmail(email) {
@@ -417,6 +429,7 @@ async function getOrCreateUser(email, declaredFreeUsed) {
 
 async function buildUserSummary(email, declaredFreeUsed = 0) {
   const user = await getOrCreateUser(email, declaredFreeUsed);
+  const isOwner = isOwnerEmail(email);
   const freeUsed = user?.free_generations_used || 0;
   const paidCredits = user?.paid_credits || 0;
   const credits = Math.max(0, FREE_TRIAL_LIMIT - freeUsed) + paidCredits;
@@ -425,7 +438,7 @@ async function buildUserSummary(email, declaredFreeUsed = 0) {
     .select('*', { count: 'exact', head: true })
     .eq('user_email', email);
   if (error) throw new Error('Database error loading account');
-  return { email, credits, hasPaid: paidCredits > 0 || (count || 0) > 0 };
+  return { email, credits, hasPaid: isOwner || paidCredits > 0 || (count || 0) > 0, isOwner };
 }
 
 async function sendPurchaseWebhook(payload) {
@@ -722,7 +735,7 @@ app.post('/api/auth/device-session', authRateLimit, async (req, res) => {
     if (countError) throw new Error('Database error loading account');
 
     const currentEmail = getSessionEmail(req);
-    const protectedAccount = (existingUser?.paid_credits || 0) > 0 || (count || 0) > 0;
+    const protectedAccount = isOwnerEmail(email) || (existingUser?.paid_credits || 0) > 0 || (count || 0) > 0;
     if (protectedAccount && currentEmail !== email) {
       return res.status(401).json({ error: 'EMAIL_VERIFICATION_REQUIRED' });
     }
@@ -802,6 +815,7 @@ app.post('/api/generate', optionalAuth, async (req, res) => {
   const { image, mimeType, style, aspectRatio, prompt } = req.body;
   const email = req.authEmail || null;
   const hasEmail = Boolean(email);
+  const isOwner = isOwnerEmail(email);
   const clientKey = getClientKey(req);
   let anonymousIdentity = null;
   let generationSlotTaken = false;
@@ -848,7 +862,7 @@ app.post('/api/generate', optionalAuth, async (req, res) => {
       if (error) throw new Error('Database error loading account');
       user = data;
       const credits = user ? Math.max(0, FREE_TRIAL_LIMIT - (user.free_generations_used || 0)) + (user.paid_credits || 0) : 0;
-      if (!user || credits <= 0) throw new HttpError(403, 'OUT_OF_CREDITS');
+      if ((!user || credits <= 0) && !isOwner) throw new HttpError(403, 'OUT_OF_CREDITS');
     }
 
     const generationPrompt = `${RESTORATION_PROMPT}\nAdditional historical context from user, if any: ${safePrompt || 'none'}`;
@@ -858,7 +872,7 @@ app.post('/api/generate', optionalAuth, async (req, res) => {
     ]);
 
     let usedPaidCredit = false;
-    if (hasEmail && user) {
+    if (hasEmail && user && !isOwner) {
       if ((user.paid_credits || 0) > 0) {
         const { data: updated, error } = await supabase
           .from('users')
@@ -880,18 +894,19 @@ app.post('/api/generate', optionalAuth, async (req, res) => {
           .maybeSingle();
         if (error || !updated) throw new Error('Credit update conflict');
       }
-      if (usedPaidCredit) {
-        const { error } = await supabase.from('generations').insert({
-          user_email: email,
-          style_name: style,
-          aspect_ratio: aspectRatio,
-          generated_image_url: `data:image/jpeg;base64,${genImg}`,
-          status: 'success',
-        });
-        if (error) console.error('[Gallery] Failed to save generated image');
-      }
     } else if (anonymousIdentity) {
       anonymousUsageStore.increment(anonymousIdentity.token);
+    }
+
+    if (hasEmail && user && (usedPaidCredit || isOwner)) {
+      const { error } = await supabase.from('generations').insert({
+        user_email: email,
+        style_name: style,
+        aspect_ratio: aspectRatio,
+        generated_image_url: `data:image/jpeg;base64,${genImg}`,
+        status: 'success',
+      });
+      if (error) console.error('[Gallery] Failed to save generated image');
     }
 
     appendStatsEvent('generation_success', {
@@ -899,7 +914,7 @@ app.post('/api/generate', optionalAuth, async (req, res) => {
       maskedEmail: email ? maskEmail(email) : null,
       action: 'generate',
       style,
-      creditType: usedPaidCredit ? 'paid' : 'free',
+      creditType: isOwner ? 'owner' : (usedPaidCredit ? 'paid' : 'free'),
       mode: hasEmail ? 'email' : 'anonymous',
     });
     res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
@@ -912,6 +927,7 @@ app.post('/api/generate', optionalAuth, async (req, res) => {
 
 app.post('/api/refine', requireAuth, async (req, res) => {
   const email = req.authEmail;
+  const isOwner = isOwnerEmail(email);
   const generationKey = `email:${email}`;
   let generationSlotTaken = false;
   try {
@@ -924,22 +940,24 @@ app.post('/api/refine', requireAuth, async (req, res) => {
     const { data: user, error: userError } = await supabase.from('users').select('paid_credits').eq('email', email).maybeSingle();
     if (userError) throw new Error('Database error loading account');
     const paidCredits = user?.paid_credits || 0;
-    if (paidCredits <= 0) throw new HttpError(403, 'OUT_OF_CREDITS');
+    if (paidCredits <= 0 && !isOwner) throw new HttpError(403, 'OUT_OF_CREDITS');
 
     const genImg = await generateImage([
       { text: `${MASTER_PROMPT}\nRefine image. Apply user corrections: ${safePrompt}` },
       { inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64Data } },
     ]);
-    const { data: updated, error } = await supabase
-      .from('users')
-      .update({ paid_credits: paidCredits - 1 })
-      .eq('email', email)
-      .eq('paid_credits', paidCredits)
-      .select('paid_credits')
-      .maybeSingle();
-    if (error || !updated) throw new Error('Credit update conflict');
+    if (!isOwner) {
+      const { data: updated, error } = await supabase
+        .from('users')
+        .update({ paid_credits: paidCredits - 1 })
+        .eq('email', email)
+        .eq('paid_credits', paidCredits)
+        .select('paid_credits')
+        .maybeSingle();
+      if (error || !updated) throw new Error('Credit update conflict');
+    }
     appendStatsEvent('generation_success', {
-      emailHash: statsIdentity(email), maskedEmail: maskEmail(email), action: 'refine', creditType: 'paid',
+      emailHash: statsIdentity(email), maskedEmail: maskEmail(email), action: 'refine', creditType: isOwner ? 'owner' : 'paid',
     });
     res.json({ imageUrl: `data:image/jpeg;base64,${genImg}` });
   } catch (err) {
@@ -951,6 +969,7 @@ app.post('/api/refine', requireAuth, async (req, res) => {
 
 app.post('/api/animate', requireAuth, async (req, res) => {
   const email = req.authEmail;
+  const isOwner = isOwnerEmail(email);
   const generationKey = `email:${email}`;
   let generationSlotTaken = false;
   try {
@@ -965,29 +984,34 @@ app.post('/api/animate', requireAuth, async (req, res) => {
       .from('users').select('paid_credits').eq('email', email).maybeSingle();
     if (userError) throw new Error('Database error loading account');
     const paidCredits = Number(user?.paid_credits || 0);
-    if (paidCredits < ANIMATION_CREDIT_COST) {
+    if (paidCredits < ANIMATION_CREDIT_COST && !isOwner) {
       throw new HttpError(403, `ANIMATION_REQUIRES_${ANIMATION_CREDIT_COST}_CREDITS`);
     }
 
     const video = await generateAnimationVideo(imagePayload, req.body.aspectRatio);
-    const { data: updated, error: updateError } = await supabase
-      .from('users')
-      .update({ paid_credits: paidCredits - ANIMATION_CREDIT_COST })
-      .eq('email', email)
-      .eq('paid_credits', paidCredits)
-      .select('paid_credits')
-      .maybeSingle();
-    if (updateError || !updated) throw new HttpError(409, 'Your balance changed. The video was not charged.');
+    let remainingPaidCredits = paidCredits;
+    if (!isOwner) {
+      const { data: updated, error: updateError } = await supabase
+        .from('users')
+        .update({ paid_credits: paidCredits - ANIMATION_CREDIT_COST })
+        .eq('email', email)
+        .eq('paid_credits', paidCredits)
+        .select('paid_credits')
+        .maybeSingle();
+      if (updateError || !updated) throw new HttpError(409, 'Your balance changed. The video was not charged.');
+      remainingPaidCredits = Number(updated.paid_credits || 0);
+    }
 
     appendStatsEvent('animation_success', {
       emailHash: statsIdentity(email),
       maskedEmail: maskEmail(email),
-      creditsUsed: ANIMATION_CREDIT_COST,
+      creditsUsed: isOwner ? 0 : ANIMATION_CREDIT_COST,
+      creditType: isOwner ? 'owner' : 'paid',
       output: 'short_video',
     });
     res.json({
       videoUrl: `data:${video.mimeType};base64,${video.base64Data}`,
-      credits: Math.max(0, Number(updated.paid_credits || 0)),
+      credits: Math.max(0, remainingPaidCredits),
     });
   } catch (err) {
     sendRouteError(res, 'Animate', err);
@@ -998,11 +1022,12 @@ app.post('/api/animate', requireAuth, async (req, res) => {
 
 app.post('/api/transcribe', requireAuth, async (req, res) => {
   const email = req.authEmail;
+  const isOwner = isOwnerEmail(email);
   try {
     const audioPayload = parseAudioPayload(req.body?.audio, req.body?.mimeType);
     const { data: user, error: userError } = await supabase.from('users').select('paid_credits').eq('email', email).maybeSingle();
     if (userError) throw new Error('Database error loading account');
-    if ((user?.paid_credits || 0) <= 0) throw new HttpError(403, 'VOICE_PREMIUM_ONLY');
+    if ((user?.paid_credits || 0) <= 0 && !isOwner) throw new HttpError(403, 'VOICE_PREMIUM_ONLY');
 
     const textModels = [TEXT_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash']
       .filter((model, index, list) => model && list.indexOf(model) === index);
@@ -1063,7 +1088,7 @@ app.get('/api/history', requireAuth, async (req, res) => {
     const { count, error: countError } = await supabase
       .from('generations').select('*', { count: 'exact', head: true }).eq('user_email', email);
     if (countError) throw new Error('Database error loading gallery');
-    const hasGalleryAccess = (user?.paid_credits || 0) > 0 || (count || 0) > 0;
+    const hasGalleryAccess = isOwnerEmail(email) || (user?.paid_credits || 0) > 0 || (count || 0) > 0;
     if (!hasGalleryAccess) throw new HttpError(403, 'HISTORY_PREMIUM_ONLY');
 
     const { data: generations, error } = await supabase
