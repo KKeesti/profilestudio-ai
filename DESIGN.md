@@ -72,7 +72,7 @@ All primary touch targets should be at least 48px high. Icon-only controls requi
 ## Content Rules
 
 - Say what the person receives, not which AI technology is used.
-- Use “10 free” and “no email or bank card” near the first action.
+- Use “3 free restorations” and “no email or bank card” near the first action.
 - Never claim exact identity preservation as a guarantee; describe it as the product goal.
 - Keep all six supported languages aligned in meaning and action order.
 

@@ -7,6 +7,7 @@ import BeforeAfter from './BeforeAfter';
 
 interface LandingSectionsProps {
   language: Language;
+  animationAvailable: boolean;
   onUpload: () => void;
   onShowPricing: () => void;
 }
@@ -24,6 +25,83 @@ const GENERATIONS: Record<Language, string> = {
   [Language.FI]: 'generointia',
 };
 
+const ILLUSTRATION_NOTE: Record<Language, string> = {
+  [Language.EN]: 'The images below illustrate the process.',
+  [Language.ET]: 'Allolevad pildid näitavad protsessi illustratiivselt.',
+  [Language.RU]: 'Изображения ниже иллюстрируют процесс.',
+  [Language.LV]: 'Zemāk redzamie attēli ilustrē procesu.',
+  [Language.LT]: 'Žemiau pateikti vaizdai iliustruoja procesą.',
+  [Language.FI]: 'Alla olevat kuvat havainnollistavat prosessia.',
+};
+
+const PROCESS_GUIDE: Record<Language, {
+  steps: Array<{ title: string; description: string; image: string }>;
+  animationTitle: string;
+  animationDescription: string;
+  animationHint: string;
+}> = {
+  [Language.EN]: {
+    steps: [
+      { title: '1. Photograph the old photo', description: 'Point your phone at the printed photograph or choose it from your gallery.', image: '/guide/step-capture.webp' },
+      { title: '2. Wait for restoration', description: 'We clean damage, restore clarity, and bring back natural colour.', image: '/guide/step-restore.webp' },
+      { title: '3. Save the result', description: 'Check the restored photo and download it to your phone.', image: '/guide/step-save.webp' },
+    ],
+    animationTitle: 'Want to see the memory move?',
+    animationDescription: 'After restoration, tap “Animate photo” to create a short moving memory. Animation is a separate paid step.',
+    animationHint: 'Available after restoration · 10 credits',
+  },
+  [Language.ET]: {
+    steps: [
+      { title: '1. Pildista vana foto', description: 'Suuna telefon trükitud fotole või vali pilt galeriist.', image: '/guide/step-capture.webp' },
+      { title: '2. Oota taastamist', description: 'Eemaldame kahjustused, taastame teravuse ja loomulikud värvid.', image: '/guide/step-restore.webp' },
+      { title: '3. Salvesta tulemus', description: 'Kontrolli taastatud fotot ja salvesta see telefoni.', image: '/guide/step-save.webp' },
+    ],
+    animationTitle: 'Kas soovite mälestust liikumas näha?',
+    animationDescription: 'Pärast taastamist vajutage „Elusta foto“, et luua lühike liikuv mälestus. Elustamine on eraldi tasuline samm.',
+    animationHint: 'Saadaval pärast taastamist · 10 krediiti',
+  },
+  [Language.RU]: {
+    steps: [
+      { title: '1. Сфотографируйте старое фото', description: 'Наведите телефон на бумажную фотографию или выберите снимок из галереи.', image: '/guide/step-capture.webp' },
+      { title: '2. Подождите восстановления', description: 'Мы уберём повреждения, вернём чёткость и естественный цвет.', image: '/guide/step-restore.webp' },
+      { title: '3. Сохраните результат', description: 'Проверьте восстановленное фото и скачайте его на телефон.', image: '/guide/step-save.webp' },
+    ],
+    animationTitle: 'Хотите увидеть воспоминание в движении?',
+    animationDescription: 'После восстановления нажмите «Оживить фото», чтобы создать короткий ролик. Оживление — отдельный платный шаг.',
+    animationHint: 'Доступно после восстановления · 10 обработок',
+  },
+  [Language.LV]: {
+    steps: [
+      { title: '1. Nofotografējiet veco foto', description: 'Pavērsiet tālruni pret papīra foto vai izvēlieties attēlu galerijā.', image: '/guide/step-capture.webp' },
+      { title: '2. Pagaidiet atjaunošanu', description: 'Noņemsim bojājumus, atjaunosim asumu un dabiskas krāsas.', image: '/guide/step-restore.webp' },
+      { title: '3. Saglabājiet rezultātu', description: 'Pārbaudiet atjaunoto foto un lejupielādējiet to tālrunī.', image: '/guide/step-save.webp' },
+    ],
+    animationTitle: 'Vai vēlaties redzēt atmiņu kustībā?',
+    animationDescription: 'Pēc atjaunošanas nospiediet „Atdzīvināt foto“, lai radītu īsu kustīgu atmiņu. Atdzīvināšana ir atsevišķs maksas solis.',
+    animationHint: 'Pieejams pēc atjaunošanas · 10 kredīti',
+  },
+  [Language.LT]: {
+    steps: [
+      { title: '1. Nufotografuokite seną nuotrauką', description: 'Nukreipkite telefoną į popierinę nuotrauką arba pasirinkite ją galerijoje.', image: '/guide/step-capture.webp' },
+      { title: '2. Palaukite atkūrimo', description: 'Pašalinsime pažeidimus, atkursime ryškumą ir natūralias spalvas.', image: '/guide/step-restore.webp' },
+      { title: '3. Išsaugokite rezultatą', description: 'Patikrinkite atkurtą nuotrauką ir atsisiųskite ją į telefoną.', image: '/guide/step-save.webp' },
+    ],
+    animationTitle: 'Norite pamatyti prisiminimą judant?',
+    animationDescription: 'Po atkūrimo paspauskite „Atgaivinti nuotrauką“, kad sukurtumėte trumpą judantį prisiminimą. Atgaivinimas yra atskiras mokamas žingsnis.',
+    animationHint: 'Galima po atkūrimo · 10 kreditų',
+  },
+  [Language.FI]: {
+    steps: [
+      { title: '1. Kuvaa vanha valokuva', description: 'Suuntaa puhelin paperikuvaan tai valitse kuva galleriasta.', image: '/guide/step-capture.webp' },
+      { title: '2. Odota entisöintiä', description: 'Poistamme vauriot, palautamme terävyyden ja luonnolliset värit.', image: '/guide/step-restore.webp' },
+      { title: '3. Tallenna tulos', description: 'Tarkista entisöity kuva ja lataa se puhelimeesi.', image: '/guide/step-save.webp' },
+    ],
+    animationTitle: 'Haluatko nähdä muiston liikkuvan?',
+    animationDescription: 'Paina entisöinnin jälkeen „Elävöitä kuva“ luodaksesi lyhyen liikkuvan muiston. Elävöitys on erillinen maksullinen vaihe.',
+    animationHint: 'Saatavilla entisöinnin jälkeen · 10 krediittiä',
+  },
+};
+
 const CheckIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
     <path d="m5 10.5 3.1 3L15 6.7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -32,6 +110,7 @@ const CheckIcon = () => (
 
 const LandingSections: React.FC<LandingSectionsProps> = ({
   language,
+  animationAvailable,
   onUpload,
   onShowPricing,
 }) => {
@@ -59,7 +138,7 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
     },
   ];
   const examples = restoreExamples;
-  const processImages = ['/demo/restoration-before.webp', '/examples/restore-family-1895-after.webp', '/demo/restoration-after.webp'];
+  const guide = PROCESS_GUIDE[language];
 
   return (
     <>
@@ -111,23 +190,31 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
           <div className="max-w-3xl">
             <h2 className="text-balance text-3xl font-extrabold leading-tight text-lab-ink sm:text-5xl">{copy.howTitle}</h2>
             <p className="mt-4 max-w-[65ch] text-base leading-7 text-lab-ink/70">{copy.howIntro}</p>
+            <p className="mt-2 text-sm font-semibold text-lab-ink/55">{ILLUSTRATION_NOTE[language]}</p>
           </div>
-          <div className="mt-9 grid gap-8 md:grid-cols-3">
-            {copy.steps.map((step, index) => (
-              <div key={step.title}>
-                <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-lab-mist">
-                  <img src={processImages[index]} alt="" loading="lazy" className="h-full w-full object-cover object-top" />
-                  {index === 2 && (
-                    <span className="absolute bottom-4 left-4 flex h-11 w-11 items-center justify-center rounded-md bg-lab-coral text-lab-ink shadow-[0_8px_20px_rgba(21,48,43,0.24)]">
-                      <ICONS.Download />
-                    </span>
-                  )}
+          <ol className="mt-9 grid gap-9 md:grid-cols-3 md:gap-7">
+            {guide.steps.map((step) => (
+              <li key={step.title} className="group relative">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-lab-mist shadow-[0_18px_40px_rgba(21,48,43,0.16)] transition-transform duration-300 sm:group-hover:-translate-y-1">
+                  <img src={step.image} alt="" loading="lazy" className="h-full w-full object-cover" />
                 </div>
-                <h3 className="mt-5 text-xl font-extrabold text-lab-ink">{step.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-lab-ink/65">{step.description}</p>
-              </div>
+                <h3 className="mt-5 text-xl font-extrabold leading-snug text-lab-ink">{step.title}</h3>
+                <p className="mt-2 max-w-[34ch] text-[15px] leading-6 text-lab-ink/70">{step.description}</p>
+              </li>
             ))}
-          </div>
+          </ol>
+
+          {animationAvailable && <article className="mt-12 grid overflow-hidden rounded-[24px] bg-lab-ink text-white shadow-[0_24px_50px_rgba(21,48,43,0.18)] md:grid-cols-[0.9fr_1.1fr] md:items-center">
+            <div className="relative order-2 p-7 sm:p-10 md:order-1">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lab-coral text-lab-ink shadow-[0_11px_24px_rgba(241,105,79,0.3),inset_0_1px_0_rgba(255,255,255,0.55)]"><ICONS.Play /></div>
+              <h3 className="mt-6 max-w-[18ch] text-2xl font-extrabold leading-tight sm:text-3xl">{guide.animationTitle}</h3>
+              <p className="mt-4 max-w-[48ch] text-[15px] leading-7 text-[#d8ece6]">{guide.animationDescription}</p>
+              <p className="mt-6 text-sm font-bold text-[#9dc8be]">{guide.animationHint}</p>
+            </div>
+            <div className="relative order-1 aspect-[4/3] overflow-hidden md:order-2 md:aspect-auto md:h-full">
+              <img src="/guide/step-animate.webp" alt="" loading="lazy" className="h-full w-full object-cover" />
+            </div>
+          </article>}
         </div>
       </section>
 

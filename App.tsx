@@ -23,12 +23,21 @@ const OWNER_ACCESS_LABEL: Record<Language, string> = {
 };
 
 const MOBILE_UPLOAD_COPY: Record<Language, { camera: string; gallery: string; privacy: string }> = {
-  [Language.EN]: { camera: 'Take a photo', gallery: 'Choose from gallery', privacy: 'Your photo stays yours' },
-  [Language.ET]: { camera: 'Pildista foto', gallery: 'Vali galeriist', privacy: 'Sinu foto jääb sulle' },
-  [Language.RU]: { camera: 'Сфотографировать фото', gallery: 'Выбрать из галереи', privacy: 'Ваше фото остаётся вашим' },
-  [Language.LV]: { camera: 'Nofotografēt attēlu', gallery: 'Izvēlēties no galerijas', privacy: 'Jūsu foto paliek jūsu' },
-  [Language.LT]: { camera: 'Nufotografuoti nuotrauką', gallery: 'Pasirinkti iš galerijos', privacy: 'Jūsų nuotrauka lieka jūsų' },
-  [Language.FI]: { camera: 'Ota kuva valokuvasta', gallery: 'Valitse galleriasta', privacy: 'Kuvasi pysyy omana' },
+  [Language.EN]: { camera: 'Photograph the old photo', gallery: 'Choose from gallery', privacy: 'Your photo stays yours' },
+  [Language.ET]: { camera: 'Pildista vana foto', gallery: 'Vali galeriist', privacy: 'Sinu foto jääb sulle' },
+  [Language.RU]: { camera: 'Сфотографировать старое фото', gallery: 'Выбрать из галереи', privacy: 'Ваше фото остаётся вашим' },
+  [Language.LV]: { camera: 'Nofotografēt veco foto', gallery: 'Izvēlēties no galerijas', privacy: 'Jūsu foto paliek jūsu' },
+  [Language.LT]: { camera: 'Nufotografuoti seną nuotrauką', gallery: 'Pasirinkti iš galerijos', privacy: 'Jūsų nuotrauka lieka jūsų' },
+  [Language.FI]: { camera: 'Kuvaa vanha valokuva', gallery: 'Valitse galleriasta', privacy: 'Kuvasi pysyy omana' },
+};
+
+const RESTORE_FOLLOW_UP: Record<Language, string> = {
+  [Language.EN]: 'First restore the photo. After that, you can choose to animate it.',
+  [Language.ET]: 'Esmalt taastage foto. Seejärel saate soovi korral selle elustada.',
+  [Language.RU]: 'Сначала восстановите фото. Затем, если захотите, сможете его оживить.',
+  [Language.LV]: 'Vispirms atjaunojiet foto. Pēc tam, ja vēlaties, varēsiet to atdzīvināt.',
+  [Language.LT]: 'Pirmiausia atkurkite nuotrauką. Tada, jei norėsite, galėsite ją atgaivinti.',
+  [Language.FI]: 'Entisöi kuva ensin. Sen jälkeen voit halutessasi elävöittää sen.',
 };
 
 const ANIMATION_COPY: Record<Language, { cost: string; detail: string; processing: string; result: string; download: string; permission: string }> = {
@@ -498,7 +507,7 @@ const App: React.FC = () => {
                 setProcessing({ isProcessing: true, status: language === Language.RU ? 'Применяем правки...' : 'Refining...' });
                 const res = await GeminiService.refinePhoto(resultImage!, text);
                 setResultImage(res);
-                setCredits(prev => Math.max(0, prev - 1));
+                if (!isOwner) setCredits(prev => Math.max(0, prev - 1));
               }
             } catch (err: any) {
               alert(err.message === 'VOICE_PREMIUM_ONLY' 
@@ -558,15 +567,18 @@ const App: React.FC = () => {
                   <p className="mx-auto mt-5 max-w-[35rem] text-[16px] leading-7 text-lab-ink/70 sm:text-lg lg:mx-0">
                     {t.restoreLandingDesc}
                   </p>
+                  <p className="mx-auto mt-3 max-w-[35rem] text-sm font-semibold leading-6 text-lab-teal lg:mx-0">
+                    {RESTORE_FOLLOW_UP[language]}
+                  </p>
 
                   <div className="mx-auto mt-7 grid max-w-md gap-3 lg:mx-0">
                     <button
                       ref={uploadCtaRef}
                       type="button"
                       onClick={openCamera}
-                      className="flex min-h-16 w-full items-center justify-center gap-3 rounded-xl bg-lab-coral px-5 py-4 text-base font-extrabold text-lab-ink shadow-[0_14px_30px_rgba(241,105,79,0.22)] transition-colors hover:bg-[#f47e65] active:translate-y-px sm:text-lg"
+                      className="flex min-h-[68px] w-full items-center justify-center gap-3 rounded-2xl border border-[#e85d47] bg-lab-coral px-5 py-4 text-base font-extrabold text-lab-ink shadow-[0_17px_32px_rgba(241,105,79,0.28),inset_0_1px_0_rgba(255,255,255,0.62)] transition-all hover:-translate-y-0.5 hover:bg-[#f47e65] hover:shadow-[0_21px_38px_rgba(241,105,79,0.34),inset_0_1px_0_rgba(255,255,255,0.62)] active:translate-y-px sm:text-lg"
                     >
-                      <ICONS.Camera /> {mobileCopy.camera}
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"><ICONS.Camera /></span> {mobileCopy.camera}
                     </button>
                     <button
                       type="button"
@@ -575,9 +587,9 @@ const App: React.FC = () => {
                       onDragOver={(event) => event.preventDefault()}
                       onDragLeave={() => setIsUploadDragging(false)}
                       onDrop={handleImageDrop}
-                      className={`flex min-h-14 w-full items-center justify-center gap-3 rounded-xl border-2 px-5 py-3 text-base font-extrabold transition-colors active:translate-y-px ${isUploadDragging ? 'border-lab-teal bg-[#e4efe9] text-lab-teal' : 'border-lab-ink bg-transparent text-lab-ink hover:bg-white'}`}
+                      className={`flex min-h-[60px] w-full items-center justify-center gap-3 rounded-2xl border-2 px-5 py-3 text-base font-extrabold shadow-[0_10px_24px_rgba(21,48,43,0.08),inset_0_1px_0_rgba(255,255,255,0.92)] transition-all hover:-translate-y-0.5 active:translate-y-px ${isUploadDragging ? 'border-lab-teal bg-[#e4efe9] text-lab-teal' : 'border-lab-ink bg-white text-lab-ink hover:bg-lab-mist'}`}
                     >
-                      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lab-mist shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
                       {mobileCopy.gallery}
                     </button>
                   </div>
@@ -622,6 +634,7 @@ const App: React.FC = () => {
 
             <LandingSections
               language={language}
+              animationAvailable={animationAvailable}
               onUpload={openUpload}
               onShowPricing={() => {
                 trackFunnel('payment_opened', { language, screen: AppStep.UPLOAD });
