@@ -35,7 +35,7 @@ const ILLUSTRATION_NOTE: Record<Language, string> = {
 };
 
 const PROCESS_GUIDE: Record<Language, {
-  steps: Array<{ title: string; description: string; image: string }>;
+  steps: Array<{ title: string; description: string }>;
   animationTitle: string;
   animationDescription: string;
   animationHint: string;
@@ -43,9 +43,9 @@ const PROCESS_GUIDE: Record<Language, {
 }> = {
   [Language.EN]: {
     steps: [
-      { title: '1. Photograph the old photo', description: 'Point your phone at the printed photograph or choose it from your gallery.', image: '/guide/step-capture.webp' },
-      { title: '2. Wait for restoration', description: 'We clean damage, restore clarity, and bring back natural colour.', image: '/guide/step-restore.webp' },
-      { title: '3. Save the result', description: 'Check the restored photo and download it to your phone.', image: '/guide/step-save.webp' },
+      { title: '1. Photograph the old photo', description: 'Point your phone at the printed photograph or choose it from your gallery.' },
+      { title: '2. Wait for restoration', description: 'We clean damage, restore clarity, and bring back natural colour.' },
+      { title: '3. Save the result', description: 'Check the restored photo and download it to your phone.' },
     ],
     animationTitle: 'Want to see the memory move?',
     animationDescription: 'After restoration, tap “Animate photo” to create a short moving memory. Animation is a separate paid step.',
@@ -54,9 +54,9 @@ const PROCESS_GUIDE: Record<Language, {
   },
   [Language.ET]: {
     steps: [
-      { title: '1. Pildista vana foto', description: 'Suuna telefon trükitud fotole või vali pilt galeriist.', image: '/guide/step-capture.webp' },
-      { title: '2. Oota taastamist', description: 'Eemaldame kahjustused, taastame teravuse ja loomulikud värvid.', image: '/guide/step-restore.webp' },
-      { title: '3. Salvesta tulemus', description: 'Kontrolli taastatud fotot ja salvesta see telefoni.', image: '/guide/step-save.webp' },
+      { title: '1. Pildista vana foto', description: 'Suuna telefon trükitud fotole või vali pilt galeriist.' },
+      { title: '2. Oota taastamist', description: 'Eemaldame kahjustused, taastame teravuse ja loomulikud värvid.' },
+      { title: '3. Salvesta tulemus', description: 'Kontrolli taastatud fotot ja salvesta see telefoni.' },
     ],
     animationTitle: 'Kas soovite mälestust liikumas näha?',
     animationDescription: 'Pärast taastamist vajutage „Elusta foto“, et luua lühike liikuv mälestus. Elustamine on eraldi tasuline samm.',
@@ -65,9 +65,9 @@ const PROCESS_GUIDE: Record<Language, {
   },
   [Language.RU]: {
     steps: [
-      { title: '1. Сфотографируйте старое фото', description: 'Наведите телефон на бумажную фотографию или выберите снимок из галереи.', image: '/guide/step-capture.webp' },
-      { title: '2. Подождите восстановления', description: 'Мы уберём повреждения, вернём чёткость и естественный цвет.', image: '/guide/step-restore.webp' },
-      { title: '3. Сохраните результат', description: 'Проверьте восстановленное фото и скачайте его на телефон.', image: '/guide/step-save.webp' },
+      { title: '1. Сфотографируйте старое фото', description: 'Наведите телефон на бумажную фотографию или выберите снимок из галереи.' },
+      { title: '2. Подождите восстановления', description: 'Мы уберём повреждения, вернём чёткость и естественный цвет.' },
+      { title: '3. Сохраните результат', description: 'Проверьте восстановленное фото и скачайте его на телефон.' },
     ],
     animationTitle: 'Хотите увидеть воспоминание в движении?',
     animationDescription: 'После восстановления нажмите «Оживить фото», чтобы создать короткий ролик. Оживление — отдельный платный шаг.',
@@ -76,9 +76,9 @@ const PROCESS_GUIDE: Record<Language, {
   },
   [Language.LV]: {
     steps: [
-      { title: '1. Nofotografējiet veco foto', description: 'Pavērsiet tālruni pret papīra foto vai izvēlieties attēlu galerijā.', image: '/guide/step-capture.webp' },
-      { title: '2. Pagaidiet atjaunošanu', description: 'Noņemsim bojājumus, atjaunosim asumu un dabiskas krāsas.', image: '/guide/step-restore.webp' },
-      { title: '3. Saglabājiet rezultātu', description: 'Pārbaudiet atjaunoto foto un lejupielādējiet to tālrunī.', image: '/guide/step-save.webp' },
+      { title: '1. Nofotografējiet veco foto', description: 'Pavērsiet tālruni pret papīra foto vai izvēlieties attēlu galerijā.' },
+      { title: '2. Pagaidiet atjaunošanu', description: 'Noņemsim bojājumus, atjaunosim asumu un dabiskas krāsas.' },
+      { title: '3. Saglabājiet rezultātu', description: 'Pārbaudiet atjaunoto foto un lejupielādējiet to tālrunī.' },
     ],
     animationTitle: 'Vai vēlaties redzēt atmiņu kustībā?',
     animationDescription: 'Pēc atjaunošanas nospiediet „Atdzīvināt foto“, lai radītu īsu kustīgu atmiņu. Atdzīvināšana ir atsevišķs maksas solis.',
@@ -87,9 +87,9 @@ const PROCESS_GUIDE: Record<Language, {
   },
   [Language.LT]: {
     steps: [
-      { title: '1. Nufotografuokite seną nuotrauką', description: 'Nukreipkite telefoną į popierinę nuotrauką arba pasirinkite ją galerijoje.', image: '/guide/step-capture.webp' },
-      { title: '2. Palaukite atkūrimo', description: 'Pašalinsime pažeidimus, atkursime ryškumą ir natūralias spalvas.', image: '/guide/step-restore.webp' },
-      { title: '3. Išsaugokite rezultatą', description: 'Patikrinkite atkurtą nuotrauką ir atsisiųskite ją į telefoną.', image: '/guide/step-save.webp' },
+      { title: '1. Nufotografuokite seną nuotrauką', description: 'Nukreipkite telefoną į popierinę nuotrauką arba pasirinkite ją galerijoje.' },
+      { title: '2. Palaukite atkūrimo', description: 'Pašalinsime pažeidimus, atkursime ryškumą ir natūralias spalvas.' },
+      { title: '3. Išsaugokite rezultatą', description: 'Patikrinkite atkurtą nuotrauką ir atsisiųskite ją į telefoną.' },
     ],
     animationTitle: 'Norite pamatyti prisiminimą judant?',
     animationDescription: 'Po atkūrimo paspauskite „Atgaivinti nuotrauką“, kad sukurtumėte trumpą judantį prisiminimą. Atgaivinimas yra atskiras mokamas žingsnis.',
@@ -98,9 +98,9 @@ const PROCESS_GUIDE: Record<Language, {
   },
   [Language.FI]: {
     steps: [
-      { title: '1. Kuvaa vanha valokuva', description: 'Suuntaa puhelin paperikuvaan tai valitse kuva galleriasta.', image: '/guide/step-capture.webp' },
-      { title: '2. Odota entisöintiä', description: 'Poistamme vauriot, palautamme terävyyden ja luonnolliset värit.', image: '/guide/step-restore.webp' },
-      { title: '3. Tallenna tulos', description: 'Tarkista entisöity kuva ja lataa se puhelimeesi.', image: '/guide/step-save.webp' },
+      { title: '1. Kuvaa vanha valokuva', description: 'Suuntaa puhelin paperikuvaan tai valitse kuva galleriasta.' },
+      { title: '2. Odota entisöintiä', description: 'Poistamme vauriot, palautamme terävyyden ja luonnolliset värit.' },
+      { title: '3. Tallenna tulos', description: 'Tarkista entisöity kuva ja lataa se puhelimeesi.' },
     ],
     animationTitle: 'Haluatko nähdä muiston liikkuvan?',
     animationDescription: 'Paina entisöinnin jälkeen „Elävöitä kuva“ luodaksesi lyhyen liikkuvan muiston. Elävöitys on erillinen maksullinen vaihe.',
@@ -146,9 +146,39 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
   ];
   const examples = restoreExamples;
   const guide = PROCESS_GUIDE[language];
+  const guideBefore = '/examples/restore-family-1930-before.png';
+  const guideAfter = '/examples/restore-family-1930-after.png';
+  const animationPreview = animationAvailable ? (
+    <section id="animation-example" className="bg-lab-paper px-4 py-14 sm:px-6 sm:py-20">
+      <div className="mx-auto max-w-[1200px]">
+        <article className="grid overflow-hidden rounded-[24px] bg-lab-ink text-white shadow-[0_24px_50px_rgba(21,48,43,0.18)] md:grid-cols-[0.9fr_1.1fr] md:items-center">
+          <div className="relative order-2 p-7 sm:p-10 md:order-1">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lab-coral text-lab-ink shadow-[0_11px_24px_rgba(241,105,79,0.3),inset_0_1px_0_rgba(255,255,255,0.55)]"><ICONS.Play /></div>
+            <h2 className="mt-6 max-w-[18ch] text-2xl font-extrabold leading-tight sm:text-3xl">{guide.animationTitle}</h2>
+            <p className="mt-4 max-w-[48ch] text-[15px] leading-7 text-[#d8ece6]">{guide.animationDescription}</p>
+            <p className="mt-6 text-sm font-bold text-[#9dc8be]">{guide.animationHint}</p>
+            <p className="mt-3 text-sm font-semibold text-[#d8ece6]">{guide.animationExample}</p>
+          </div>
+          <div className="relative order-1 aspect-[4/3] overflow-hidden md:order-2 md:aspect-auto md:h-full">
+            <video
+              className="h-full w-full object-cover"
+              controls
+              playsInline
+              preload="metadata"
+              poster="/guide/step-animate.webp"
+              aria-label={guide.animationExample}
+            >
+              <source src="/demo/animation-example.mp4" type="video/mp4" />
+            </video>
+          </div>
+        </article>
+      </div>
+    </section>
+  ) : null;
 
   return (
     <>
+      {animationPreview}
       <section id="examples" className="bg-white px-4 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -200,38 +230,18 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
             <p className="mt-2 text-sm font-semibold text-lab-ink/55">{ILLUSTRATION_NOTE[language]}</p>
           </div>
           <ol className="mt-9 grid gap-9 md:grid-cols-3 md:gap-7">
-            {guide.steps.map((step) => (
+            {guide.steps.map((step, index) => (
               <li key={step.title} className="group relative">
                 <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-lab-mist shadow-[0_18px_40px_rgba(21,48,43,0.16)] transition-transform duration-300 sm:group-hover:-translate-y-1">
-                  <img src={step.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  <img src={index === 2 ? guideAfter : guideBefore} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  {index === 1 && <div className="absolute inset-x-5 bottom-5 rounded-xl bg-lab-ink/85 px-4 py-3 text-center text-sm font-bold text-white shadow-lg">{step.title}</div>}
+                  {index === 2 && <img src={guideBefore} alt="" loading="lazy" className="absolute bottom-5 left-5 h-24 w-20 rounded-lg border-2 border-white object-cover shadow-lg" />}
                 </div>
                 <h3 className="mt-5 text-xl font-extrabold leading-snug text-lab-ink">{step.title}</h3>
                 <p className="mt-2 max-w-[34ch] text-[15px] leading-6 text-lab-ink/70">{step.description}</p>
               </li>
             ))}
           </ol>
-
-          {animationAvailable && <article className="mt-12 grid overflow-hidden rounded-[24px] bg-lab-ink text-white shadow-[0_24px_50px_rgba(21,48,43,0.18)] md:grid-cols-[0.9fr_1.1fr] md:items-center">
-            <div className="relative order-2 p-7 sm:p-10 md:order-1">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lab-coral text-lab-ink shadow-[0_11px_24px_rgba(241,105,79,0.3),inset_0_1px_0_rgba(255,255,255,0.55)]"><ICONS.Play /></div>
-              <h3 className="mt-6 max-w-[18ch] text-2xl font-extrabold leading-tight sm:text-3xl">{guide.animationTitle}</h3>
-              <p className="mt-4 max-w-[48ch] text-[15px] leading-7 text-[#d8ece6]">{guide.animationDescription}</p>
-              <p className="mt-6 text-sm font-bold text-[#9dc8be]">{guide.animationHint}</p>
-              <p className="mt-3 text-sm font-semibold text-[#d8ece6]">{guide.animationExample}</p>
-            </div>
-            <div className="relative order-1 aspect-[4/3] overflow-hidden md:order-2 md:aspect-auto md:h-full">
-              <video
-                className="h-full w-full object-cover"
-                controls
-                playsInline
-                preload="metadata"
-                poster="/guide/step-animate.webp"
-                aria-label={guide.animationExample}
-              >
-                <source src="/demo/animation-example.mp4" type="video/mp4" />
-              </video>
-            </div>
-          </article>}
         </div>
       </section>
 
