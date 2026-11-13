@@ -60,7 +60,7 @@ const PROCESS_GUIDE: Record<Language, {
       { title: '2. Подождите восстановления', description: 'Мы уберём повреждения, вернём чёткость и естественный цвет.', image: '/guide/step-restore.webp' },
       { title: '3. Сохраните результат', description: 'Проверьте восстановленное фото и скачайте его на телефон.', image: '/guide/step-save.webp' },
     ],
-    restorationVideoTitle: 'Посмотрите, как восстанавливается старое фото',
+    restorationVideoTitle: 'Посмотрите, как оживляется старая фотография',
     restorationVideoDescription: 'Поблекшее семейное фото снова становится чётким и цветным. Свою фотографию вы восстановите так же просто.',
     restorationVideoCta: 'Запустить видео',
   },
