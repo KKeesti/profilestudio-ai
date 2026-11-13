@@ -39,6 +39,7 @@ const PROCESS_GUIDE: Record<Language, {
   animationTitle: string;
   animationDescription: string;
   animationHint: string;
+  animationExample: string;
 }> = {
   [Language.EN]: {
     steps: [
@@ -49,6 +50,7 @@ const PROCESS_GUIDE: Record<Language, {
     animationTitle: 'Want to see the memory move?',
     animationDescription: 'After restoration, tap “Animate photo” to create a short moving memory. Animation is a separate paid step.',
     animationHint: 'Available after restoration · 10 credits',
+    animationExample: 'Example animation',
   },
   [Language.ET]: {
     steps: [
@@ -59,6 +61,7 @@ const PROCESS_GUIDE: Record<Language, {
     animationTitle: 'Kas soovite mälestust liikumas näha?',
     animationDescription: 'Pärast taastamist vajutage „Elusta foto“, et luua lühike liikuv mälestus. Elustamine on eraldi tasuline samm.',
     animationHint: 'Saadaval pärast taastamist · 10 krediiti',
+    animationExample: 'Elustamise näide',
   },
   [Language.RU]: {
     steps: [
@@ -69,6 +72,7 @@ const PROCESS_GUIDE: Record<Language, {
     animationTitle: 'Хотите увидеть воспоминание в движении?',
     animationDescription: 'После восстановления нажмите «Оживить фото», чтобы создать короткий ролик. Оживление — отдельный платный шаг.',
     animationHint: 'Доступно после восстановления · 10 обработок',
+    animationExample: 'Пример оживления',
   },
   [Language.LV]: {
     steps: [
@@ -79,6 +83,7 @@ const PROCESS_GUIDE: Record<Language, {
     animationTitle: 'Vai vēlaties redzēt atmiņu kustībā?',
     animationDescription: 'Pēc atjaunošanas nospiediet „Atdzīvināt foto“, lai radītu īsu kustīgu atmiņu. Atdzīvināšana ir atsevišķs maksas solis.',
     animationHint: 'Pieejams pēc atjaunošanas · 10 kredīti',
+    animationExample: 'Atdzīvināšanas piemērs',
   },
   [Language.LT]: {
     steps: [
@@ -89,6 +94,7 @@ const PROCESS_GUIDE: Record<Language, {
     animationTitle: 'Norite pamatyti prisiminimą judant?',
     animationDescription: 'Po atkūrimo paspauskite „Atgaivinti nuotrauką“, kad sukurtumėte trumpą judantį prisiminimą. Atgaivinimas yra atskiras mokamas žingsnis.',
     animationHint: 'Galima po atkūrimo · 10 kreditų',
+    animationExample: 'Atgaivinimo pavyzdys',
   },
   [Language.FI]: {
     steps: [
@@ -99,6 +105,7 @@ const PROCESS_GUIDE: Record<Language, {
     animationTitle: 'Haluatko nähdä muiston liikkuvan?',
     animationDescription: 'Paina entisöinnin jälkeen „Elävöitä kuva“ luodaksesi lyhyen liikkuvan muiston. Elävöitys on erillinen maksullinen vaihe.',
     animationHint: 'Saatavilla entisöinnin jälkeen · 10 krediittiä',
+    animationExample: 'Esimerkki elävöityksestä',
   },
 };
 
@@ -210,9 +217,19 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
               <h3 className="mt-6 max-w-[18ch] text-2xl font-extrabold leading-tight sm:text-3xl">{guide.animationTitle}</h3>
               <p className="mt-4 max-w-[48ch] text-[15px] leading-7 text-[#d8ece6]">{guide.animationDescription}</p>
               <p className="mt-6 text-sm font-bold text-[#9dc8be]">{guide.animationHint}</p>
+              <p className="mt-3 text-sm font-semibold text-[#d8ece6]">{guide.animationExample}</p>
             </div>
             <div className="relative order-1 aspect-[4/3] overflow-hidden md:order-2 md:aspect-auto md:h-full">
-              <img src="/guide/step-animate.webp" alt="" loading="lazy" className="h-full w-full object-cover" />
+              <video
+                className="h-full w-full object-cover"
+                controls
+                playsInline
+                preload="metadata"
+                poster="/guide/step-animate.webp"
+                aria-label={guide.animationExample}
+              >
+                <source src="/demo/animation-example.mp4" type="video/mp4" />
+              </video>
             </div>
           </article>}
         </div>
