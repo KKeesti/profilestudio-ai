@@ -3,17 +3,12 @@ import { ICONS } from '../constants';
 import { LANDING_CONTENT } from '../landingContent';
 import { TRANSLATIONS } from '../translations';
 import { Language } from '../types';
-import BeforeAfter from './BeforeAfter';
 
 interface LandingSectionsProps {
   language: Language;
   onUpload: () => void;
   onShowPricing: () => void;
 }
-
-const SOURCE_LINKS = {
-  restoreMain: 'https://commons.wikimedia.org/wiki/File:Portrait_of_woman,_1940.jpg',
-};
 
 const GENERATIONS: Record<Language, string> = {
   [Language.EN]: 'generations',
@@ -114,28 +109,6 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
 }) => {
   const copy = LANDING_CONTENT[language];
   const t = TRANSLATIONS[language];
-  const restoreExamples = [
-    {
-      before: '/demo/restoration-before.webp',
-      after: '/demo/restoration-after.webp',
-      title: copy.restoreExamples[0],
-      source: SOURCE_LINKS.restoreMain,
-      objectPosition: 'center top',
-    },
-    {
-      before: '/examples/restore-family-1930-before.png',
-      after: '/examples/restore-family-1930-after.png',
-      title: copy.restoreExamples[1],
-      objectPosition: 'center',
-    },
-    {
-      before: '/examples/restore-family-1940-before.png',
-      after: '/examples/restore-family-1940-after.png',
-      title: copy.restoreExamples[2],
-      objectPosition: 'center',
-    },
-  ];
-  const examples = restoreExamples;
   const guide = PROCESS_GUIDE[language];
   const guideBefore = '/examples/restore-family-1930-before.png';
   const guideAfter = '/examples/restore-family-1930-after.png';
@@ -169,49 +142,6 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
   return (
     <>
       {restorationPreview}
-      <section id="examples" className="bg-white px-4 py-14 sm:px-6 sm:py-20">
-        <div className="mx-auto max-w-[1200px]">
-          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-            <div className="max-w-3xl">
-              <h2 className="text-balance text-3xl font-extrabold leading-tight text-lab-ink sm:text-5xl">
-                {copy.galleryRestoreTitle}
-              </h2>
-              <p className="mt-4 max-w-[70ch] text-base leading-7 text-lab-ink/70">{copy.galleryIntro}</p>
-            </div>
-            <span className="text-sm font-bold text-lab-teal">{copy.realResults}</span>
-          </div>
-
-          <div className="mt-9 grid gap-6 lg:grid-cols-3">
-            {examples.map((example) => (
-              <article key={example.title} className="min-w-0">
-                <BeforeAfter
-                  before={example.before}
-                  after={example.after}
-                  beforeLabel={t.demoBefore}
-                  afterLabel={t.demoAfter}
-                  ariaLabel={`${copy.compareLabel}: ${example.title}`}
-                  className="aspect-[4/5] rounded-lg"
-                  objectPosition={example.objectPosition}
-                />
-                <div className="mt-4 flex items-start justify-between gap-3">
-                  <h3 className="text-lg font-extrabold text-lab-ink">{example.title}</h3>
-                  {example.source && (
-                    <a
-                      href={example.source}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 text-xs font-semibold text-lab-ink/55 underline decoration-lab-line underline-offset-4 hover:text-lab-teal"
-                    >
-                      {copy.sourcePhoto}
-                    </a>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="bg-lab-paper px-4 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-[1200px]">
           <div className="max-w-3xl">
