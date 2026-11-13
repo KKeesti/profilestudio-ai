@@ -634,7 +634,6 @@ const App: React.FC = () => {
 
             <LandingSections
               language={language}
-              animationAvailable={animationAvailable}
               onUpload={openUpload}
               onShowPricing={() => {
                 trackFunnel('payment_opened', { language, screen: AppStep.UPLOAD });

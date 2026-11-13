@@ -7,7 +7,6 @@ import BeforeAfter from './BeforeAfter';
 
 interface LandingSectionsProps {
   language: Language;
-  animationAvailable: boolean;
   onUpload: () => void;
   onShowPricing: () => void;
 }
@@ -36,10 +35,9 @@ const ILLUSTRATION_NOTE: Record<Language, string> = {
 
 const PROCESS_GUIDE: Record<Language, {
   steps: Array<{ title: string; description: string }>;
-  animationTitle: string;
-  animationDescription: string;
-  animationHint: string;
-  animationExample: string;
+  restorationVideoTitle: string;
+  restorationVideoDescription: string;
+  restorationVideoExample: string;
 }> = {
   [Language.EN]: {
     steps: [
@@ -47,10 +45,9 @@ const PROCESS_GUIDE: Record<Language, {
       { title: '2. Wait for restoration', description: 'We clean damage, restore clarity, and bring back natural colour.' },
       { title: '3. Save the result', description: 'Check the restored photo and download it to your phone.' },
     ],
-    animationTitle: 'Want to see the memory move?',
-    animationDescription: 'After restoration, tap “Animate photo” to create a short moving memory. Animation is a separate paid step.',
-    animationHint: 'Available after restoration · 10 credits',
-    animationExample: 'Example animation',
+    restorationVideoTitle: 'See an old photo restored',
+    restorationVideoDescription: 'Watch a faded family photo regain clarity and natural colour. You can restore your own photo just as simply.',
+    restorationVideoExample: 'Restoration example',
   },
   [Language.ET]: {
     steps: [
@@ -58,10 +55,9 @@ const PROCESS_GUIDE: Record<Language, {
       { title: '2. Oota taastamist', description: 'Eemaldame kahjustused, taastame teravuse ja loomulikud värvid.' },
       { title: '3. Salvesta tulemus', description: 'Kontrolli taastatud fotot ja salvesta see telefoni.' },
     ],
-    animationTitle: 'Kas soovite mälestust liikumas näha?',
-    animationDescription: 'Pärast taastamist vajutage „Elusta foto“, et luua lühike liikuv mälestus. Elustamine on eraldi tasuline samm.',
-    animationHint: 'Saadaval pärast taastamist · 10 krediiti',
-    animationExample: 'Elustamise näide',
+    restorationVideoTitle: 'Vaadake, kuidas vana foto taastub',
+    restorationVideoDescription: 'Vaadake, kuidas pleekinud perefoto saab tagasi selguse ja loomuliku värvi. Ka oma foto saate sama lihtsalt taastada.',
+    restorationVideoExample: 'Taastamise näide',
   },
   [Language.RU]: {
     steps: [
@@ -69,10 +65,9 @@ const PROCESS_GUIDE: Record<Language, {
       { title: '2. Подождите восстановления', description: 'Мы уберём повреждения, вернём чёткость и естественный цвет.' },
       { title: '3. Сохраните результат', description: 'Проверьте восстановленное фото и скачайте его на телефон.' },
     ],
-    animationTitle: 'Хотите увидеть воспоминание в движении?',
-    animationDescription: 'После восстановления нажмите «Оживить фото», чтобы создать короткий ролик. Оживление — отдельный платный шаг.',
-    animationHint: 'Доступно после восстановления · 10 обработок',
-    animationExample: 'Пример оживления',
+    restorationVideoTitle: 'Посмотрите, как восстанавливается старая фотография',
+    restorationVideoDescription: 'Поблекшее семейное фото снова становится чётким и цветным. Свою фотографию вы восстановите так же просто.',
+    restorationVideoExample: 'Пример восстановления',
   },
   [Language.LV]: {
     steps: [
@@ -80,10 +75,9 @@ const PROCESS_GUIDE: Record<Language, {
       { title: '2. Pagaidiet atjaunošanu', description: 'Noņemsim bojājumus, atjaunosim asumu un dabiskas krāsas.' },
       { title: '3. Saglabājiet rezultātu', description: 'Pārbaudiet atjaunoto foto un lejupielādējiet to tālrunī.' },
     ],
-    animationTitle: 'Vai vēlaties redzēt atmiņu kustībā?',
-    animationDescription: 'Pēc atjaunošanas nospiediet „Atdzīvināt foto“, lai radītu īsu kustīgu atmiņu. Atdzīvināšana ir atsevišķs maksas solis.',
-    animationHint: 'Pieejams pēc atjaunošanas · 10 kredīti',
-    animationExample: 'Atdzīvināšanas piemērs',
+    restorationVideoTitle: 'Skatiet, kā tiek atjaunota veca fotogrāfija',
+    restorationVideoDescription: 'Noskatieties, kā izbalējis ģimenes foto atgūst skaidrību un dabiskas krāsas. Savu foto varat atjaunot tikpat vienkārši.',
+    restorationVideoExample: 'Atjaunošanas piemērs',
   },
   [Language.LT]: {
     steps: [
@@ -91,10 +85,9 @@ const PROCESS_GUIDE: Record<Language, {
       { title: '2. Palaukite atkūrimo', description: 'Pašalinsime pažeidimus, atkursime ryškumą ir natūralias spalvas.' },
       { title: '3. Išsaugokite rezultatą', description: 'Patikrinkite atkurtą nuotrauką ir atsisiųskite ją į telefoną.' },
     ],
-    animationTitle: 'Norite pamatyti prisiminimą judant?',
-    animationDescription: 'Po atkūrimo paspauskite „Atgaivinti nuotrauką“, kad sukurtumėte trumpą judantį prisiminimą. Atgaivinimas yra atskiras mokamas žingsnis.',
-    animationHint: 'Galima po atkūrimo · 10 kreditų',
-    animationExample: 'Atgaivinimo pavyzdys',
+    restorationVideoTitle: 'Pažiūrėkite, kaip atkuriama sena nuotrauka',
+    restorationVideoDescription: 'Stebėkite, kaip išblukusi šeimos nuotrauka atgauna ryškumą ir natūralias spalvas. Savo nuotrauką atkursite taip pat paprastai.',
+    restorationVideoExample: 'Atkūrimo pavyzdys',
   },
   [Language.FI]: {
     steps: [
@@ -102,10 +95,9 @@ const PROCESS_GUIDE: Record<Language, {
       { title: '2. Odota entisöintiä', description: 'Poistamme vauriot, palautamme terävyyden ja luonnolliset värit.' },
       { title: '3. Tallenna tulos', description: 'Tarkista entisöity kuva ja lataa se puhelimeesi.' },
     ],
-    animationTitle: 'Haluatko nähdä muiston liikkuvan?',
-    animationDescription: 'Paina entisöinnin jälkeen „Elävöitä kuva“ luodaksesi lyhyen liikkuvan muiston. Elävöitys on erillinen maksullinen vaihe.',
-    animationHint: 'Saatavilla entisöinnin jälkeen · 10 krediittiä',
-    animationExample: 'Esimerkki elävöityksestä',
+    restorationVideoTitle: 'Katso, miten vanha kuva entisöidään',
+    restorationVideoDescription: 'Katso, miten haalistunut perhekuva saa takaisin terävyyden ja luonnolliset värit. Voit entisöidä oman kuvasi yhtä helposti.',
+    restorationVideoExample: 'Esimerkki entisöinnistä',
   },
 };
 
@@ -117,7 +109,6 @@ const CheckIcon = () => (
 
 const LandingSections: React.FC<LandingSectionsProps> = ({
   language,
-  animationAvailable,
   onUpload,
   onShowPricing,
 }) => {
@@ -148,16 +139,15 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
   const guide = PROCESS_GUIDE[language];
   const guideBefore = '/examples/restore-family-1930-before.png';
   const guideAfter = '/examples/restore-family-1930-after.png';
-  const animationPreview = animationAvailable ? (
-    <section id="animation-example" className="bg-lab-paper px-4 py-14 sm:px-6 sm:py-20">
+  const restorationPreview = (
+    <section id="restoration-example" className="bg-lab-paper px-4 py-14 sm:px-6 sm:py-20">
       <div className="mx-auto max-w-[1200px]">
         <article className="grid overflow-hidden rounded-[24px] bg-lab-ink text-white shadow-[0_24px_50px_rgba(21,48,43,0.18)] md:grid-cols-[0.9fr_1.1fr] md:items-center">
           <div className="relative order-2 p-7 sm:p-10 md:order-1">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lab-coral text-lab-ink shadow-[0_11px_24px_rgba(241,105,79,0.3),inset_0_1px_0_rgba(255,255,255,0.55)]"><ICONS.Play /></div>
-            <h2 className="mt-6 max-w-[18ch] text-2xl font-extrabold leading-tight sm:text-3xl">{guide.animationTitle}</h2>
-            <p className="mt-4 max-w-[48ch] text-[15px] leading-7 text-[#d8ece6]">{guide.animationDescription}</p>
-            <p className="mt-6 text-sm font-bold text-[#9dc8be]">{guide.animationHint}</p>
-            <p className="mt-3 text-sm font-semibold text-[#d8ece6]">{guide.animationExample}</p>
+            <h2 className="mt-6 max-w-[18ch] text-2xl font-extrabold leading-tight sm:text-3xl">{guide.restorationVideoTitle}</h2>
+            <p className="mt-4 max-w-[48ch] text-[15px] leading-7 text-[#d8ece6]">{guide.restorationVideoDescription}</p>
+            <p className="mt-6 text-sm font-semibold text-[#d8ece6]">{guide.restorationVideoExample}</p>
           </div>
           <div className="relative order-1 aspect-[4/3] overflow-hidden md:order-2 md:aspect-auto md:h-full">
             <video
@@ -165,20 +155,20 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
               controls
               playsInline
               preload="metadata"
-              poster="/guide/step-animate.webp"
-              aria-label={guide.animationExample}
+              poster="/demo/restoration-before.webp"
+              aria-label={guide.restorationVideoExample}
             >
-              <source src="/demo/animation-example.mp4" type="video/mp4" />
+              <source src="/demo/restoration-example.mp4" type="video/mp4" />
             </video>
           </div>
         </article>
       </div>
     </section>
-  ) : null;
+  );
 
   return (
     <>
-      {animationPreview}
+      {restorationPreview}
       <section id="examples" className="bg-white px-4 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
