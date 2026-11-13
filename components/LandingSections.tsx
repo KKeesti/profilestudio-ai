@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ICONS } from '../constants';
 import { LANDING_CONTENT } from '../landingContent';
 import { TRANSLATIONS } from '../translations';
@@ -29,70 +29,70 @@ const ILLUSTRATION_NOTE: Record<Language, string> = {
 };
 
 const PROCESS_GUIDE: Record<Language, {
-  steps: Array<{ title: string; description: string }>;
+  steps: Array<{ title: string; description: string; image: string }>;
   restorationVideoTitle: string;
   restorationVideoDescription: string;
-  restorationVideoExample: string;
+  restorationVideoCta: string;
 }> = {
   [Language.EN]: {
     steps: [
-      { title: '1. Photograph the old photo', description: 'Point your phone at the printed photograph or choose it from your gallery.' },
-      { title: '2. Wait for restoration', description: 'We clean damage, restore clarity, and bring back natural colour.' },
-      { title: '3. Save the result', description: 'Check the restored photo and download it to your phone.' },
+      { title: '1. Photograph the old photo', description: 'Point your phone at the printed photograph or choose it from your gallery.', image: '/guide/step-capture.webp' },
+      { title: '2. Wait for restoration', description: 'We clean damage, restore clarity, and bring back natural colour.', image: '/guide/step-restore.webp' },
+      { title: '3. Save the result', description: 'Check the restored photo and download it to your phone.', image: '/guide/step-save.webp' },
     ],
-    restorationVideoTitle: 'See an old photo restored',
+    restorationVideoTitle: 'How to restore an old photo',
     restorationVideoDescription: 'Watch a faded family photo regain clarity and natural colour. You can restore your own photo just as simply.',
-    restorationVideoExample: 'Restoration example',
+    restorationVideoCta: 'Watch the video',
   },
   [Language.ET]: {
     steps: [
-      { title: '1. Pildista vana foto', description: 'Suuna telefon trükitud fotole või vali pilt galeriist.' },
-      { title: '2. Oota taastamist', description: 'Eemaldame kahjustused, taastame teravuse ja loomulikud värvid.' },
-      { title: '3. Salvesta tulemus', description: 'Kontrolli taastatud fotot ja salvesta see telefoni.' },
+      { title: '1. Pildista vana foto', description: 'Suuna telefon trükitud fotole või vali pilt galeriist.', image: '/guide/step-capture.webp' },
+      { title: '2. Oota taastamist', description: 'Eemaldame kahjustused, taastame teravuse ja loomulikud värvid.', image: '/guide/step-restore.webp' },
+      { title: '3. Salvesta tulemus', description: 'Kontrolli taastatud fotot ja salvesta see telefoni.', image: '/guide/step-save.webp' },
     ],
-    restorationVideoTitle: 'Vaadake, kuidas vana foto taastub',
+    restorationVideoTitle: 'Kuidas vana foto taastada',
     restorationVideoDescription: 'Vaadake, kuidas pleekinud perefoto saab tagasi selguse ja loomuliku värvi. Ka oma foto saate sama lihtsalt taastada.',
-    restorationVideoExample: 'Taastamise näide',
+    restorationVideoCta: 'Vaata videot',
   },
   [Language.RU]: {
     steps: [
-      { title: '1. Сфотографируйте старое фото', description: 'Наведите телефон на бумажную фотографию или выберите снимок из галереи.' },
-      { title: '2. Подождите восстановления', description: 'Мы уберём повреждения, вернём чёткость и естественный цвет.' },
-      { title: '3. Сохраните результат', description: 'Проверьте восстановленное фото и скачайте его на телефон.' },
+      { title: '1. Сфотографируйте старое фото', description: 'Наведите телефон на бумажную фотографию или выберите снимок из галереи.', image: '/guide/step-capture.webp' },
+      { title: '2. Подождите восстановления', description: 'Мы уберём повреждения, вернём чёткость и естественный цвет.', image: '/guide/step-restore.webp' },
+      { title: '3. Сохраните результат', description: 'Проверьте восстановленное фото и скачайте его на телефон.', image: '/guide/step-save.webp' },
     ],
-    restorationVideoTitle: 'Посмотрите, как восстанавливается старая фотография',
+    restorationVideoTitle: 'Как восстановить старое фото',
     restorationVideoDescription: 'Поблекшее семейное фото снова становится чётким и цветным. Свою фотографию вы восстановите так же просто.',
-    restorationVideoExample: 'Пример восстановления',
+    restorationVideoCta: 'Посмотреть видео',
   },
   [Language.LV]: {
     steps: [
-      { title: '1. Nofotografējiet veco foto', description: 'Pavērsiet tālruni pret papīra foto vai izvēlieties attēlu galerijā.' },
-      { title: '2. Pagaidiet atjaunošanu', description: 'Noņemsim bojājumus, atjaunosim asumu un dabiskas krāsas.' },
-      { title: '3. Saglabājiet rezultātu', description: 'Pārbaudiet atjaunoto foto un lejupielādējiet to tālrunī.' },
+      { title: '1. Nofotografējiet veco foto', description: 'Pavērsiet tālruni pret papīra foto vai izvēlieties attēlu galerijā.', image: '/guide/step-capture.webp' },
+      { title: '2. Pagaidiet atjaunošanu', description: 'Noņemsim bojājumus, atjaunosim asumu un dabiskas krāsas.', image: '/guide/step-restore.webp' },
+      { title: '3. Saglabājiet rezultātu', description: 'Pārbaudiet atjaunoto foto un lejupielādējiet to tālrunī.', image: '/guide/step-save.webp' },
     ],
-    restorationVideoTitle: 'Skatiet, kā tiek atjaunota veca fotogrāfija',
+    restorationVideoTitle: 'Kā atjaunot vecu foto',
     restorationVideoDescription: 'Noskatieties, kā izbalējis ģimenes foto atgūst skaidrību un dabiskas krāsas. Savu foto varat atjaunot tikpat vienkārši.',
-    restorationVideoExample: 'Atjaunošanas piemērs',
+    restorationVideoCta: 'Skatīties video',
   },
   [Language.LT]: {
     steps: [
-      { title: '1. Nufotografuokite seną nuotrauką', description: 'Nukreipkite telefoną į popierinę nuotrauką arba pasirinkite ją galerijoje.' },
-      { title: '2. Palaukite atkūrimo', description: 'Pašalinsime pažeidimus, atkursime ryškumą ir natūralias spalvas.' },
-      { title: '3. Išsaugokite rezultatą', description: 'Patikrinkite atkurtą nuotrauką ir atsisiųskite ją į telefoną.' },
+      { title: '1. Nufotografuokite seną nuotrauką', description: 'Nukreipkite telefoną į popierinę nuotrauką arba pasirinkite ją galerijoje.', image: '/guide/step-capture.webp' },
+      { title: '2. Palaukite atkūrimo', description: 'Pašalinsime pažeidimus, atkursime ryškumą ir natūralias spalvas.', image: '/guide/step-restore.webp' },
+      { title: '3. Išsaugokite rezultatą', description: 'Patikrinkite atkurtą nuotrauką ir atsisiųskite ją į telefoną.', image: '/guide/step-save.webp' },
     ],
-    restorationVideoTitle: 'Pažiūrėkite, kaip atkuriama sena nuotrauka',
+    restorationVideoTitle: 'Kaip atkurti seną nuotrauką',
     restorationVideoDescription: 'Stebėkite, kaip išblukusi šeimos nuotrauka atgauna ryškumą ir natūralias spalvas. Savo nuotrauką atkursite taip pat paprastai.',
-    restorationVideoExample: 'Atkūrimo pavyzdys',
+    restorationVideoCta: 'Žiūrėti vaizdo įrašą',
   },
   [Language.FI]: {
     steps: [
-      { title: '1. Kuvaa vanha valokuva', description: 'Suuntaa puhelin paperikuvaan tai valitse kuva galleriasta.' },
-      { title: '2. Odota entisöintiä', description: 'Poistamme vauriot, palautamme terävyyden ja luonnolliset värit.' },
-      { title: '3. Tallenna tulos', description: 'Tarkista entisöity kuva ja lataa se puhelimeesi.' },
+      { title: '1. Kuvaa vanha valokuva', description: 'Suuntaa puhelin paperikuvaan tai valitse kuva galleriasta.', image: '/guide/step-capture.webp' },
+      { title: '2. Odota entisöintiä', description: 'Poistamme vauriot, palautamme terävyyden ja luonnolliset värit.', image: '/guide/step-restore.webp' },
+      { title: '3. Tallenna tulos', description: 'Tarkista entisöity kuva ja lataa se puhelimeesi.', image: '/guide/step-save.webp' },
     ],
-    restorationVideoTitle: 'Katso, miten vanha kuva entisöidään',
+    restorationVideoTitle: 'Näin entisöit vanhan kuvan',
     restorationVideoDescription: 'Katso, miten haalistunut perhekuva saa takaisin terävyyden ja luonnolliset värit. Voit entisöidä oman kuvasi yhtä helposti.',
-    restorationVideoExample: 'Esimerkki entisöinnistä',
+    restorationVideoCta: 'Katso video',
   },
 };
 
@@ -110,30 +110,35 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
   const copy = LANDING_CONTENT[language];
   const t = TRANSLATIONS[language];
   const guide = PROCESS_GUIDE[language];
-  const guideBefore = '/examples/restore-family-1930-before.png';
-  const guideAfter = '/examples/restore-family-1930-after.png';
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isVideoOpen) return undefined;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsVideoOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [isVideoOpen]);
+
   const restorationPreview = (
-    <section id="restoration-example" className="bg-lab-paper px-4 py-14 sm:px-6 sm:py-20">
+    <section id="restoration-example" className="bg-white px-4 py-14 sm:px-6 sm:py-20">
       <div className="mx-auto max-w-[1200px]">
         <article className="grid overflow-hidden rounded-[24px] bg-lab-ink text-white shadow-[0_24px_50px_rgba(21,48,43,0.18)] md:grid-cols-[0.9fr_1.1fr] md:items-center">
           <div className="relative order-2 p-7 sm:p-10 md:order-1">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lab-coral text-lab-ink shadow-[0_11px_24px_rgba(241,105,79,0.3),inset_0_1px_0_rgba(255,255,255,0.55)]"><ICONS.Play /></div>
             <h2 className="mt-6 max-w-[18ch] text-2xl font-extrabold leading-tight sm:text-3xl">{guide.restorationVideoTitle}</h2>
             <p className="mt-4 max-w-[48ch] text-[15px] leading-7 text-[#d8ece6]">{guide.restorationVideoDescription}</p>
-            <p className="mt-6 text-sm font-semibold text-[#d8ece6]">{guide.restorationVideoExample}</p>
+            <button type="button" onClick={() => setIsVideoOpen(true)} className="mt-7 flex min-h-12 items-center gap-3 rounded-md bg-lab-coral px-5 py-3 font-extrabold text-lab-ink transition-colors hover:bg-white">
+              <ICONS.Play /> {guide.restorationVideoCta}
+            </button>
           </div>
-          <div className="relative order-1 aspect-[4/3] overflow-hidden md:order-2 md:aspect-auto md:h-full">
-            <video
-              className="h-full w-full object-cover"
-              controls
-              playsInline
-              preload="metadata"
-              poster="/demo/restoration-before.webp"
-              aria-label={guide.restorationVideoExample}
-            >
-              <source src="/demo/restoration-example.mp4" type="video/mp4" />
-            </video>
-          </div>
+          <button type="button" onClick={() => setIsVideoOpen(true)} aria-label={guide.restorationVideoCta} className="group relative order-1 aspect-[4/3] overflow-hidden text-left md:order-2 md:aspect-auto md:h-full">
+            <img src="/demo/restoration-before.webp" alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            <span className="absolute inset-0 bg-lab-ink/20" aria-hidden="true" />
+            <span className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-lab-coral text-lab-ink shadow-[0_12px_30px_rgba(0,0,0,0.28)] transition-transform duration-300 group-hover:scale-110" aria-hidden="true"><ICONS.Play /></span>
+          </button>
         </article>
       </div>
     </section>
@@ -141,7 +146,6 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
 
   return (
     <>
-      {restorationPreview}
       <section className="bg-lab-paper px-4 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-[1200px]">
           <div className="max-w-3xl">
@@ -150,12 +154,10 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
             <p className="mt-2 text-sm font-semibold text-lab-ink/55">{ILLUSTRATION_NOTE[language]}</p>
           </div>
           <ol className="mt-9 grid gap-9 md:grid-cols-3 md:gap-7">
-            {guide.steps.map((step, index) => (
+            {guide.steps.map((step) => (
               <li key={step.title} className="group relative">
                 <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-lab-mist shadow-[0_18px_40px_rgba(21,48,43,0.16)] transition-transform duration-300 sm:group-hover:-translate-y-1">
-                  <img src={index === 2 ? guideAfter : guideBefore} alt="" loading="lazy" className="h-full w-full object-cover" />
-                  {index === 1 && <div className="absolute inset-x-5 bottom-5 rounded-xl bg-lab-ink/85 px-4 py-3 text-center text-sm font-bold text-white shadow-lg">{step.title}</div>}
-                  {index === 2 && <img src={guideBefore} alt="" loading="lazy" className="absolute bottom-5 left-5 h-24 w-20 rounded-lg border-2 border-white object-cover shadow-lg" />}
+                  <img src={step.image} alt="" loading="lazy" className="h-full w-full object-cover" />
                 </div>
                 <h3 className="mt-5 text-xl font-extrabold leading-snug text-lab-ink">{step.title}</h3>
                 <p className="mt-2 max-w-[34ch] text-[15px] leading-6 text-lab-ink/70">{step.description}</p>
@@ -164,6 +166,8 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
           </ol>
         </div>
       </section>
+
+      {restorationPreview}
 
       <section id="pricing" className="bg-white px-4 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-[1200px]">
@@ -252,6 +256,15 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
           </button>
         </div>
       </section>
+
+      {isVideoOpen && (
+        <div className="fixed inset-0 z-[340] flex items-center justify-center bg-lab-ink/80 px-4 py-6" role="dialog" aria-modal="true" aria-label={guide.restorationVideoTitle} onClick={() => setIsVideoOpen(false)}>
+          <div className="relative w-full max-w-4xl" onClick={(event) => event.stopPropagation()}>
+            <button type="button" onClick={() => setIsVideoOpen(false)} className="absolute -right-1 -top-12 flex h-10 w-10 items-center justify-center rounded-full bg-white text-2xl font-semibold text-lab-ink shadow-lg" aria-label="Close">×</button>
+            <video className="max-h-[80vh] w-full rounded-2xl bg-black shadow-2xl" controls autoPlay playsInline preload="metadata" src="/demo/restoration-example.mp4" />
+          </div>
+        </div>
+      )}
     </>
   );
 };

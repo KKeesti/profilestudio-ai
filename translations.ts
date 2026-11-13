@@ -225,7 +225,7 @@ export const TRANSLATIONS = {
     demoSource: "Открытый источник",
     freeNoSignup: "3 восстановления бесплатно. Email не нужен.",
     restoreHeaderTagline: "Восстановление старых фотографий и бережная колоризация.",
-    restoreLandingTitle: "Восстановите семейное фото за 1 минуту",
+    restoreLandingTitle: "Восстановите старое фото за одну минуту",
     restoreLandingDesc: "Убираем царапины, возвращаем резкость и цвет в духе эпохи.",
     restoreLandingCta: "Восстановить моё фото бесплатно",
     restoreLandingFree: "3 восстановления бесплатно. Без email и банковской карты.",
