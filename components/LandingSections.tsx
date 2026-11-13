@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useRef } from 'react';
 import { ICONS } from '../constants';
 import { LANDING_CONTENT } from '../landingContent';
 import { TRANSLATIONS } from '../translations';
@@ -60,9 +60,9 @@ const PROCESS_GUIDE: Record<Language, {
       { title: '2. Подождите восстановления', description: 'Мы уберём повреждения, вернём чёткость и естественный цвет.', image: '/guide/step-restore.webp' },
       { title: '3. Сохраните результат', description: 'Проверьте восстановленное фото и скачайте его на телефон.', image: '/guide/step-save.webp' },
     ],
-    restorationVideoTitle: 'Как восстановить старое фото',
+    restorationVideoTitle: 'Посмотрите, как восстанавливается старое фото',
     restorationVideoDescription: 'Поблекшее семейное фото снова становится чётким и цветным. Свою фотографию вы восстановите так же просто.',
-    restorationVideoCta: 'Посмотреть видео',
+    restorationVideoCta: 'Запустить видео',
   },
   [Language.LV]: {
     steps: [
@@ -110,17 +110,21 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
   const copy = LANDING_CONTENT[language];
   const t = TRANSLATIONS[language];
   const guide = PROCESS_GUIDE[language];
-  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const restorationVideoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    if (!isVideoOpen) return undefined;
+  const playRestorationVideo = () => {
+    const video = restorationVideoRef.current;
+    if (!video) return;
+    video.currentTime = 0;
+    void video.play().catch(() => undefined);
+  };
 
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsVideoOpen(false);
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [isVideoOpen]);
+  const resetRestorationVideo = () => {
+    const video = restorationVideoRef.current;
+    if (!video) return;
+    video.pause();
+    video.currentTime = 0;
+  };
 
   const restorationPreview = (
     <section id="restoration-example" className="bg-white px-4 py-14 sm:px-6 sm:py-20">
@@ -130,15 +134,16 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lab-coral text-lab-ink shadow-[0_11px_24px_rgba(241,105,79,0.3),inset_0_1px_0_rgba(255,255,255,0.55)]"><ICONS.Play /></div>
             <h2 className="mt-6 max-w-[18ch] text-2xl font-extrabold leading-tight sm:text-3xl">{guide.restorationVideoTitle}</h2>
             <p className="mt-4 max-w-[48ch] text-[15px] leading-7 text-[#d8ece6]">{guide.restorationVideoDescription}</p>
-            <button type="button" onClick={() => setIsVideoOpen(true)} className="mt-7 flex min-h-12 items-center gap-3 rounded-md bg-lab-coral px-5 py-3 font-extrabold text-lab-ink transition-colors hover:bg-white">
-              <ICONS.Play /> {guide.restorationVideoCta}
+            <button type="button" onClick={playRestorationVideo} className="mt-8 flex min-h-16 items-center gap-4 rounded-xl bg-lab-coral px-7 py-4 text-lg font-extrabold text-lab-ink shadow-[0_12px_28px_rgba(241,105,79,0.32),inset_0_1px_0_rgba(255,255,255,0.55)] transition-transform hover:-translate-y-0.5 hover:bg-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-lab-ink text-white"><ICONS.Play /></span>
+              {guide.restorationVideoCta}
             </button>
           </div>
-          <button type="button" onClick={() => setIsVideoOpen(true)} aria-label={guide.restorationVideoCta} className="group relative order-1 aspect-[4/3] overflow-hidden text-left md:order-2 md:aspect-auto md:h-full">
-            <img src="/demo/restoration-before.webp" alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-            <span className="absolute inset-0 bg-lab-ink/20" aria-hidden="true" />
-            <span className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-lab-coral text-lab-ink shadow-[0_12px_30px_rgba(0,0,0,0.28)] transition-transform duration-300 group-hover:scale-110" aria-hidden="true"><ICONS.Play /></span>
-          </button>
+          <div className="relative order-1 aspect-[4/3] overflow-hidden bg-black md:order-2 md:aspect-auto md:h-full">
+            <video ref={restorationVideoRef} className="h-full w-full object-cover" playsInline preload="metadata" poster="/demo/restoration-video-poster.jpg" onEnded={resetRestorationVideo}>
+              <source src="/demo/restoration-example.mp4" type="video/mp4" />
+            </video>
+          </div>
         </article>
       </div>
     </section>
@@ -257,14 +262,6 @@ const LandingSections: React.FC<LandingSectionsProps> = ({
         </div>
       </section>
 
-      {isVideoOpen && (
-        <div className="fixed inset-0 z-[340] flex items-center justify-center bg-lab-ink/80 px-4 py-6" role="dialog" aria-modal="true" aria-label={guide.restorationVideoTitle} onClick={() => setIsVideoOpen(false)}>
-          <div className="relative w-full max-w-4xl" onClick={(event) => event.stopPropagation()}>
-            <button type="button" onClick={() => setIsVideoOpen(false)} className="absolute -right-1 -top-12 flex h-10 w-10 items-center justify-center rounded-full bg-white text-2xl font-semibold text-lab-ink shadow-lg" aria-label="Close">×</button>
-            <video className="max-h-[80vh] w-full rounded-2xl bg-black shadow-2xl" controls autoPlay playsInline preload="metadata" src="/demo/restoration-example.mp4" />
-          </div>
-        </div>
-      )}
     </>
   );
 };
